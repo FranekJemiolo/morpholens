@@ -3,6 +3,28 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "Zero-cost, 100% client-side anthropometric body composition estimation & 3D visualization PWA.",
+  "author": "Franek Jemiolo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FranekJemiolo/morpholens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/FranekJemiolo/morpholens/issues"
+  },
+  "homepage": "https://franekjemiolo.github.io/morpholens/",
+  "keywords": [
+    "anthropometry",
+    "computer-vision",
+    "mediapipe",
+    "threejs",
+    "body-composition",
+    "pwa",
+    "webassembly",
+    "client-side-ai",
+    "privacy-first"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
