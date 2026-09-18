@@ -35,7 +35,7 @@ import { MetricsDisplay } from "./components/MetricsDisplay.tsx";
 import { SAMPLE_HUMANS } from "./services/samplePresets.ts";
 
 export default function App(): React.JSX.Element {
-  const webcam = useWebcam();
+  const webcam = useWebcam(false);
 
   // Persistent user preferences
   const [anchorHeightCm, setAnchorHeightCm] = useState<number>(() => {
@@ -103,11 +103,33 @@ export default function App(): React.JSX.Element {
     setCustomOrientation((prev) => (prev === "front" ? "side" : "front"));
   }, []);
 
+  const handleStartLiveCamera = useCallback(() => {
+    if (sampleImageUrl) {
+      setSamplePresetId(null);
+      setSampleImageUrl(null);
+      setLandmarks(null);
+      setMetrics(null);
+    }
+    webcam.startLiveCamera();
+  }, [sampleImageUrl, webcam]);
+
+  const handleStopLiveCamera = useCallback(() => {
+    webcam.stopLiveCamera();
+    setLandmarks(null);
+    setMetrics(null);
+  }, [webcam]);
+
   const handleSelectSample = useCallback(
     (presetId: string | null, customUrl?: string) => {
+      if (webcam.isLiveCameraActive) {
+        webcam.stopLiveCamera();
+      }
+
       if (!presetId) {
         setSamplePresetId(null);
         setSampleImageUrl(null);
+        setLandmarks(null);
+        setMetrics(null);
         return;
       }
 
@@ -124,10 +146,11 @@ export default function App(): React.JSX.Element {
         const fullUrl = `${baseUrl.replace(/\/$/, "")}/${preset.path}`;
         setSamplePresetId(preset.id);
         setSampleImageUrl(fullUrl);
+        setCustomOrientation(preset.orientation);
         setAnchorHeightCm(preset.suggestedHeightCm);
       }
     },
-    [],
+    [webcam],
   );
 
   // Initialize MediaPipe PoseLandmarker model
@@ -564,6 +587,9 @@ export default function App(): React.JSX.Element {
                 webcam.toggleMockMode();
               }}
               onRetry={webcam.retryCamera}
+              isLiveCameraActive={webcam.isLiveCameraActive}
+              onStartLiveCamera={handleStartLiveCamera}
+              onStopLiveCamera={handleStopLiveCamera}
               anchorHeightCm={anchorHeightCm}
               metrics={metrics}
               captureStage={captureStage}

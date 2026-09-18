@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { WebcamState } from "../types/vision.ts";
 
-export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
+export function useWebcam(
+  autoStart = false,
+  initialFacingMode: "user" | "environment" = "user",
+) {
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(autoStart);
   const [state, setState] = useState<WebcamState>({
     stream: null,
-    isLoading: true,
+    isLoading: autoStart,
     error: null,
     isMock: false,
     facingMode: initialFacingMode,
@@ -52,6 +56,7 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
       stopCurrentStream();
 
       if (useMock) {
+        setIsCameraActive(false);
         setState((prev) => ({
           ...prev,
           stream: null,
@@ -66,6 +71,7 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
         return;
       }
 
+      setIsCameraActive(true);
       setState((prev) => ({
         ...prev,
         isLoading: true,
@@ -167,6 +173,7 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
 
         console.error("Webcam initialization failed:", err);
 
+        setIsCameraActive(false);
         setState({
           stream: null,
           isLoading: false,
@@ -183,24 +190,19 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
   );
 
   useEffect(() => {
-    let active = true;
-    const init = async () => {
-      if (!active) return;
-      await startCamera(state.facingMode, false);
-    };
-    init();
-
     return () => {
-      active = false;
       stopCurrentStream();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.facingMode]);
+  }, [stopCurrentStream]);
 
   const toggleFacingMode = useCallback(() => {
     const nextMode = state.facingMode === "user" ? "environment" : "user";
-    startCamera(nextMode, state.isMock);
-  }, [state.facingMode, state.isMock, startCamera]);
+    if (isCameraActive || state.isMock) {
+      startCamera(nextMode, state.isMock);
+    } else {
+      setState((prev) => ({ ...prev, facingMode: nextMode }));
+    }
+  }, [state.facingMode, state.isMock, isCameraActive, startCamera]);
 
   const toggleMockMode = useCallback(() => {
     const nextMock = !state.isMock;
@@ -211,11 +213,30 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
     startCamera(state.facingMode, false);
   }, [startCamera, state.facingMode]);
 
+  const startLiveCamera = useCallback(() => {
+    startCamera(state.facingMode, false);
+  }, [startCamera, state.facingMode]);
+
+  const stopLiveCamera = useCallback(() => {
+    stopCurrentStream();
+    setIsCameraActive(false);
+    setState((prev) => ({
+      ...prev,
+      stream: null,
+      isLoading: false,
+      error: null,
+      isMock: false,
+    }));
+  }, [stopCurrentStream]);
+
   return {
     ...state,
     videoRef,
     toggleFacingMode,
     toggleMockMode,
     retryCamera,
+    startLiveCamera,
+    stopLiveCamera,
+    isLiveCameraActive: isCameraActive && !state.isMock,
   };
 }

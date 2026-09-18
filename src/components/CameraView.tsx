@@ -3,7 +3,6 @@ import {
   RefreshCw,
   AlertTriangle,
   PlayCircle,
-  Eye,
   Activity,
   Scan,
   Compass,
@@ -11,6 +10,7 @@ import {
   Users,
   ChevronDown,
   Upload,
+  Camera,
 } from "lucide-react";
 import type {
   NormalizedLandmark,
@@ -40,6 +40,9 @@ interface CameraViewProps {
   facingMode: "user" | "environment";
   videoWidth: number;
   videoHeight: number;
+  isLiveCameraActive?: boolean;
+  onStartLiveCamera?: () => void;
+  onStopLiveCamera?: () => void;
   onToggleCamera: () => void;
   onToggleMock: () => void;
   onRetry: () => void;
@@ -70,6 +73,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
   facingMode,
   videoWidth,
   videoHeight,
+  isLiveCameraActive,
+  onStartLiveCamera,
+  onStopLiveCamera,
   onToggleCamera,
   onToggleMock,
   onRetry,
@@ -437,11 +443,12 @@ export const CameraView: React.FC<CameraViewProps> = ({
       <div className="absolute inset-0 scanline pointer-events-none opacity-40 z-10" />
 
       {/* Top HUD Status Bar */}
-      <div className="relative z-30 flex items-center justify-between p-3 bg-gradient-to-b from-slate-950/85 via-slate-950/40 to-transparent">
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-slate-900/80 rounded-md border border-cyan-500/20 text-xs font-mono">
+      <div className="relative z-30 flex items-center justify-between px-3 py-2 bg-gradient-to-b from-slate-950/95 via-slate-950/70 to-transparent gap-2">
+        {/* Left: Status & Quality Telemetry */}
+        <div className="flex items-center min-w-0 gap-1.5">
+          <div className="flex items-center space-x-1.5 px-2 py-0.5 bg-slate-900/90 rounded border border-cyan-500/20 text-[11px] font-mono whitespace-nowrap">
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-1.5 h-1.5 rounded-full ${
                 landmarks
                   ? "bg-emerald-400 animate-ping"
                   : isLoading
@@ -460,18 +467,20 @@ export const CameraView: React.FC<CameraViewProps> = ({
                   ? "ANALYZING PHOTO..."
                   : isMock
                     ? "SIMULATION"
-                    : "STANDBY"}
+                    : isLiveCameraActive
+                      ? "CAMERA ACTIVE"
+                      : "AWAITING PHOTO"}
             </span>
           </div>
 
-          <div className="hidden sm:flex items-center space-x-1 px-2 py-1 bg-slate-900/80 rounded-md border border-slate-800 text-[11px] font-mono text-slate-400">
-            <Activity className="w-3 h-3 text-cyan-400" />
+          <div className="hidden sm:flex items-center space-x-1 px-1.5 py-0.5 bg-slate-900/80 rounded border border-slate-800 text-[10px] font-mono text-slate-400 whitespace-nowrap">
+            <Activity className="w-2.5 h-2.5 text-cyan-400" />
             <span>{fps} FPS</span>
           </div>
 
           {quality && (
             <div
-              className={`hidden sm:flex items-center space-x-1 px-2.5 py-1 rounded-md border text-[11px] font-mono ${
+              className={`hidden md:flex items-center space-x-1 px-1.5 py-0.5 rounded border text-[10px] font-mono whitespace-nowrap ${
                 quality.qualityScore >= 80
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                   : quality.qualityScore >= 50
@@ -479,54 +488,88 @@ export const CameraView: React.FC<CameraViewProps> = ({
                     : "bg-amber-500/10 border-amber-500/30 text-amber-400"
               }`}
             >
-              <Scan className="w-3 h-3" />
-              <span>{quality.qualityScore}% QUALITY</span>
+              <Scan className="w-2.5 h-2.5" />
+              <span>{quality.qualityScore}%</span>
             </div>
           )}
         </div>
 
-        {/* Camera, Upload, and Scan Flow Controls */}
-        <div className="flex items-center space-x-2">
-          {captureStage === "idle" ? (
+        {/* Right: Camera, Upload, Sample Menu, and Sim Controls */}
+        <div className="flex items-center flex-shrink-0 gap-1">
+          {/* Guided Scan only for active camera capture */}
+          {isLiveCameraActive && !sampleImageUrl && (
+            <>
+              {captureStage === "idle" ? (
+                <button
+                  onClick={onStartGuidedScan}
+                  className="px-2 py-0.5 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold rounded text-[10px] font-mono transition flex items-center space-x-1 shadow-neon"
+                >
+                  <Compass className="w-3 h-3" />
+                  <span>GUIDED SCAN</span>
+                </button>
+              ) : captureStage === "completed" ? (
+                <button
+                  onClick={onResetScan}
+                  className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10px] font-mono transition flex items-center space-x-1 border border-slate-700"
+                >
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span>RE-SCAN</span>
+                </button>
+              ) : (
+                <button
+                  onClick={onResetScan}
+                  className="px-1.5 py-0.5 bg-red-950/80 hover:bg-red-900 text-red-300 rounded text-[10px] font-mono transition border border-red-500/30"
+                >
+                  CANCEL
+                </button>
+              )}
+            </>
+          )}
+
+          {/* Switch between Photo Mode and Live Camera Mode */}
+          {onStartLiveCamera && (
             <button
-              onClick={onStartGuidedScan}
-              className="px-3 py-1 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold rounded-md text-xs font-mono transition flex items-center space-x-1.5 shadow-neon"
+              data-testid="btn-toggle-camera-mode"
+              onClick={
+                isLiveCameraActive ? onStopLiveCamera : onStartLiveCamera
+              }
+              title={
+                isLiveCameraActive
+                  ? "Switch to Photo Upload Mode"
+                  : "Switch to Live Webcam Capture"
+              }
+              className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
+                isLiveCameraActive
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
+                  : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
+              }`}
             >
-              <Compass className="w-3.5 h-3.5" />
-              <span>GUIDED SCAN</span>
-            </button>
-          ) : captureStage === "completed" ? (
-            <button
-              onClick={onResetScan}
-              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md text-xs font-mono transition flex items-center space-x-1.5 border border-slate-700"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>RE-SCAN</span>
-            </button>
-          ) : (
-            <button
-              onClick={onResetScan}
-              className="px-2.5 py-1 bg-red-950/80 hover:bg-red-900 text-red-300 rounded-md text-xs font-mono transition border border-red-500/30"
-            >
-              CANCEL
+              {isLiveCameraActive ? (
+                <>
+                  <Upload className="w-3 h-3 text-cyan-400" />
+                  <span>PHOTO MODE</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-3 h-3 text-cyan-400" />
+                  <span>USE CAMERA</span>
+                </>
+              )}
             </button>
           )}
 
-          {/* Dedicated Direct Upload Photo Button */}
+          {/* Dedicated Direct Upload Photo Icon Button (Compact) */}
           <button
             data-testid="btn-upload-photo"
             onClick={() => fileInputRef.current?.click()}
             title="Upload your own full-body image"
-            className={`px-2.5 py-1 rounded-md text-xs font-mono border transition flex items-center space-x-1.5 ${
+            className={`p-1 rounded border transition flex items-center justify-center ${
               samplePresetId === "custom"
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-neon"
-                : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
+                : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50 hover:text-cyan-300"
             }`}
           >
-            <Upload className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">
-              {samplePresetId === "custom" ? "UPLOADED" : "UPLOAD"}
-            </span>
+            <Upload className="w-3 h-3 text-cyan-400" />
           </button>
           <input
             ref={fileInputRef}
@@ -543,36 +586,38 @@ export const CameraView: React.FC<CameraViewProps> = ({
               data-testid="btn-toggle-custom-angle"
               onClick={onToggleCustomOrientation}
               title="Toggle Front standing view vs Side profile view"
-              className="px-2.5 py-1 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 rounded-md text-xs font-mono transition flex items-center space-x-1"
+              className="px-1.5 py-0.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 rounded text-[10px] font-mono transition flex items-center space-x-1"
             >
-              <span className="text-[10px] text-slate-400">ANGLE:</span>
+              <span className="text-[9px] text-slate-400">ANGLE:</span>
               <span className="font-bold uppercase">
                 {customOrientation || "front"}
               </span>
             </button>
           )}
 
-          {/* Sample Human Test Subjects Selector */}
+          {/* Sample Human Test Subjects Selector Dropdown Menu */}
           <div className="relative">
             <button
               data-testid="btn-sample-toggle"
               onClick={() => setShowSampleMenu((prev) => !prev)}
-              title="Test with Generated Human Photos"
-              className={`px-2.5 py-1 rounded-md text-xs font-mono border transition flex items-center space-x-1.5 ${
+              title={
+                activePreset
+                  ? `Active Preset: ${activePreset.name} (${activePreset.suggestedHeightCm}cm)`
+                  : "Test with Generated Human Photos"
+              }
+              className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
                 samplePresetId && samplePresetId !== "custom"
                   ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
                   : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
               }`}
             >
-              <Users className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">
-                {activePreset ? activePreset.name : "SAMPLES"}
-              </span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
+              <Users className="w-3 h-3 text-cyan-400" />
+              <span>SAMPLES</span>
+              <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
             </button>
 
             {showSampleMenu && (
-              <div className="absolute right-0 mt-1.5 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-30 py-1.5 text-xs font-mono">
+              <div className="absolute right-0 mt-1 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-30 py-1 text-xs font-mono">
                 <div className="px-3 py-1 text-[10px] text-cyan-400/80 font-semibold uppercase tracking-wider border-b border-slate-800">
                   AI Human Test Subjects
                 </div>
@@ -619,42 +664,43 @@ export const CameraView: React.FC<CameraViewProps> = ({
                     }}
                     className="w-full text-left px-3 py-1.5 hover:bg-red-500/15 text-red-400 hover:text-red-300 transition border-t border-slate-800 mt-1 pt-1.5"
                   >
-                    Clear (Live Camera)
+                    Clear Photo (Standby)
                   </button>
                 )}
               </div>
             )}
           </div>
 
+          {/* Compact Simulation Button */}
           <button
             data-testid="btn-simulate"
             onClick={onToggleMock}
-            title={isMock ? "Switch to Live Camera" : "Simulate / Test Feed"}
-            className={`px-2.5 py-1 rounded-md text-xs font-mono border transition flex items-center space-x-1 ${
+            title={isMock ? "Switch to Live Camera" : "Simulate Biometric Feed"}
+            className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition flex items-center space-x-0.5 ${
               isMock
                 ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
+                : "bg-slate-900/80 text-slate-400 hover:text-slate-200 border-slate-700 hover:border-cyan-500/50"
             }`}
           >
-            <PlayCircle className="w-3.5 h-3.5" />
-            <span>{isMock ? "LIVE WEBCAM" : "SIMULATE"}</span>
+            <PlayCircle className="w-2.5 h-2.5" />
+            <span>{isMock ? "LIVE" : "SIM"}</span>
           </button>
 
-          {!isMock && !sampleImageUrl && (
+          {!isMock && !sampleImageUrl && isLiveCameraActive && (
             <button
               onClick={onToggleCamera}
               title={`Switch camera (current: ${facingMode})`}
-              className="p-1.5 bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 rounded-md border border-slate-700 transition"
+              className="p-1 bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-cyan-400 rounded border border-slate-700 transition"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-3 h-3" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Actionable Pose Quality Feedback Banner */}
+      {/* Actionable Pose Quality Feedback Banner - positioned cleanly at bottom */}
       {quality && quality.feedbackMessage && (
-        <div className="absolute top-14 inset-x-4 z-20 flex justify-center pointer-events-none">
+        <div className="absolute bottom-4 inset-x-4 z-20 flex justify-center pointer-events-none">
           <div
             className={`px-4 py-1.5 rounded-full border backdrop-blur-md text-xs font-mono flex items-center space-x-2 shadow-lg transition-all ${
               quality.alignmentState === "locked"
@@ -725,17 +771,17 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
       )}
 
-      {/* Loading Overlay */}
-      {isLoading && !isMock && !sampleImageUrl && (
+      {/* Loading Overlay for Live Camera */}
+      {isLoading && !isMock && !sampleImageUrl && isLiveCameraActive && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-sm pointer-events-none">
           <div className="p-3 bg-cyan-500/10 rounded-full border border-cyan-500/30 mb-3 animate-spin">
             <RefreshCw className="w-6 h-6 text-cyan-400" />
           </div>
           <p className="text-sm font-mono text-cyan-300">
-            Initializing MediaPipe Neural Model...
+            Connecting Biometric Optical Sensor...
           </p>
           <p className="text-xs text-slate-500 mt-1 font-mono">
-            Loading WebAssembly Runtime
+            Accessing Webcam Device
           </p>
         </div>
       )}
@@ -745,17 +791,20 @@ export const CameraView: React.FC<CameraViewProps> = ({
         <div className="absolute inset-x-4 bottom-4 z-30 p-4 bg-red-950/90 border border-red-500/50 rounded-xl backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-red-200">
           <div className="flex items-center space-x-3">
             <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-            <div className="text-xs leading-relaxed">{error}</div>
+            <div className="text-xs font-mono">
+              <p className="font-semibold text-white">Camera Offline</p>
+              <p className="text-red-300/80">{error}</p>
+            </div>
           </div>
           <div className="flex items-center space-x-2 shrink-0">
             <button
               onClick={onRetry}
-              className="px-3 py-1 bg-red-900/60 hover:bg-red-800 text-white rounded-lg text-xs font-mono transition"
+              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono transition flex items-center space-x-1 border border-slate-700"
             >
-              Retry
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry</span>
             </button>
             <button
-              data-testid="btn-upload-error"
               onClick={() => fileInputRef.current?.click()}
               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono transition flex items-center space-x-1"
             >
@@ -768,15 +817,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
               className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-mono transition flex items-center space-x-1"
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Sample</span>
-            </button>
-            <button
-              data-testid="btn-simulate-error"
-              onClick={onToggleMock}
-              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono transition flex items-center space-x-1 border border-slate-700"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Simulate</span>
+              <span>Sample Subject</span>
             </button>
           </div>
         </div>
@@ -788,7 +829,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
         !landmarks &&
         !isMock &&
         !isGuidedMode &&
-        !sampleImageUrl && (
+        !sampleImageUrl &&
+        !isLiveCameraActive && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 pt-16 pointer-events-none">
             <div className="max-w-md w-full p-6 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-cyan-500/30 text-center shadow-2xl flex flex-col items-center space-y-4 pointer-events-auto">
               <div className="p-3.5 bg-cyan-500/10 rounded-2xl border border-cyan-500/30 text-cyan-400 shadow-neon">
@@ -799,8 +841,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
                   ANALYZE FULL-BODY PHOTO
                 </h3>
                 <p className="text-xs text-slate-400 mt-1.5 leading-relaxed font-sans">
-                  Upload your own photo or drag & drop anywhere. 100%
-                  client-side WebAssembly inference — zero cloud compute.
+                  Upload your own photo or choose a sample subject. You can also
+                  switch to live camera anytime. 100% client-side WebAssembly
+                  inference — zero cloud compute.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full pt-1">
@@ -821,6 +864,16 @@ export const CameraView: React.FC<CameraViewProps> = ({
                   <span>Sample Subject</span>
                 </button>
               </div>
+              {onStartLiveCamera && (
+                <button
+                  data-testid="btn-standby-camera"
+                  onClick={onStartLiveCamera}
+                  className="w-full py-2 px-4 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-mono transition flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Switch to Live Camera</span>
+                </button>
+              )}
             </div>
           </div>
         )}

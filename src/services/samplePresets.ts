@@ -19,10 +19,18 @@ export const SAMPLE_HUMANS: SampleHumanPreset[] = [
   },
   {
     id: "male-side",
-    name: "Profile (Side)",
+    name: "Male (Side Profile)",
     gender: "male",
     orientation: "side",
     path: "samples/male-side.jpg",
     suggestedHeightCm: 182,
+  },
+  {
+    id: "female-side",
+    name: "Female (Side Profile)",
+    gender: "female",
+    orientation: "side",
+    path: "samples/female-side.jpg",
+    suggestedHeightCm: 168,
   },
 ];

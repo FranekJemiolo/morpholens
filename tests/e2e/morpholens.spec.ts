@@ -60,6 +60,33 @@ test.describe("MorphoLens E2E Suite", () => {
     await expect(page.getByText("HIP SPAN").first()).toBeVisible();
   });
 
+  test("defaults to asking for image upload and allows switching to camera mode", async ({
+    page,
+  }) => {
+    // 1. By default, prompt user for photo upload
+    await expect(page.getByText("ANALYZE FULL-BODY PHOTO")).toBeVisible();
+    await expect(page.getByText("AWAITING PHOTO")).toBeVisible();
+    await expect(page.getByTestId("btn-standby-upload")).toBeVisible();
+    await expect(page.getByTestId("btn-standby-sample")).toBeVisible();
+    await expect(page.getByTestId("btn-standby-camera")).toBeVisible();
+
+    const cameraModeBtn = page.getByTestId("btn-toggle-camera-mode");
+    await expect(cameraModeBtn).toBeVisible();
+    await expect(cameraModeBtn).toContainText(/USE CAMERA/i);
+
+    // 2. Allow user to switch to live camera if desired
+    await cameraModeBtn.click();
+    await expect(cameraModeBtn).toContainText(/PHOTO MODE/i);
+    await expect(
+      page.getByText("CAMERA ACTIVE").or(page.getByText("TRACKING ACTIVE")),
+    ).toBeVisible({ timeout: 15000 });
+
+    // 3. Allow switching back to photo upload mode
+    await cameraModeBtn.click();
+    await expect(cameraModeBtn).toContainText(/USE CAMERA/i);
+    await expect(page.getByText("ANALYZE FULL-BODY PHOTO")).toBeVisible();
+  });
+
   test("detects pose and computes telemetry using generated human test subjects", async ({
     page,
   }) => {
@@ -98,17 +125,15 @@ test.describe("MorphoLens E2E Suite", () => {
     await expect(weightCard).toBeVisible();
   });
 
-  test("allows uploading a custom image and computes telemetry from the uploaded photo", async ({
+  test("allows uploading custom images and computes telemetry across multiple diverse human photos", async ({
     page,
   }) => {
-    // Locate the file upload input
     const fileInput = page.getByTestId("input-file-upload");
     await expect(fileInput).toBeAttached();
 
-    // Upload generated human test image
+    // Test 1: Upload male front-facing image
     await fileInput.setInputFiles("tests/fixtures/images/male-front.jpg");
 
-    // Verify photo analyzed status and telemetry
     await expect(
       page.getByText("PHOTO ANALYZED").or(page.getByText("HUMAN DETECTED")),
     ).toBeVisible({ timeout: 25000 });
@@ -121,11 +146,24 @@ test.describe("MorphoLens E2E Suite", () => {
     await expect(bodyFatCard).toBeVisible();
     await expect(bodyFatCard).toContainText(/%/);
 
-    // Verify angle toggle button is present and switches orientation
+    // Test 2: Upload female front-facing image
+    await fileInput.setInputFiles("tests/fixtures/images/female-front.jpg");
+    await expect(
+      page.getByText("PHOTO ANALYZED").or(page.getByText("HUMAN DETECTED")),
+    ).toBeVisible({ timeout: 25000 });
+    await expect(weightCard).toBeVisible();
+
+    // Test 3: Upload female side profile image and toggle orientation
+    await fileInput.setInputFiles("tests/fixtures/images/female-side.jpg");
+    await expect(
+      page.getByText("PHOTO ANALYZED").or(page.getByText("HUMAN DETECTED")),
+    ).toBeVisible({ timeout: 25000 });
+
     const angleToggle = page.getByTestId("btn-toggle-custom-angle");
     await expect(angleToggle).toBeVisible();
     await angleToggle.click();
     await expect(angleToggle).toContainText(/side/i);
+    await expect(weightCard).toBeVisible();
   });
 
   test("updates anthropometric calculations when anchor height is modified", async ({
@@ -260,7 +298,10 @@ test.describe("MorphoLens E2E Suite", () => {
     // Switch back to Optical Telemetry view
     await opticalTab.click();
     await expect(
-      page.getByText("TRACKING ACTIVE").or(page.getByText("STANDBY")),
+      page
+        .getByText("AWAITING PHOTO")
+        .or(page.getByText("TRACKING ACTIVE"))
+        .or(page.getByText("STANDBY")),
     ).toBeVisible();
   });
 });
