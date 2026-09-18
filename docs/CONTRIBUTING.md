@@ -67,7 +67,7 @@ npm run format
 
 Before submitting a PR, ensure all unit and integration tests pass:
 
-```bash
+````bash
 # Run unit tests
 npm run test:unit
 
@@ -76,7 +76,18 @@ npm run test:e2e
 
 # Validate production build bundle
 npm run build
-```
+### Headless Browser & Mock Video Inputs
+
+For CI environments or machines without hardware webcams, Playwright is pre-configured with fake media stream flags:
+
+```bash
+# Playwright uses synthetic Chromium media devices:
+# --use-fake-ui-for-media-stream
+# --use-fake-device-for-media-stream
+npm run test:e2e
+````
+
+In the browser UI, click the **"SIMULATE"** button on the camera HUD to toggle the synthetic 33-point biomechanical mannequin without requiring webcam permissions.
 
 ---
 

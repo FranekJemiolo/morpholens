@@ -47,7 +47,53 @@ flowchart TD
 
 ---
 
-## 2. MediaPipe Landmark Topology
+## 2. Multi-Angle Guided Capture Sequence State Machine
+
+The guided capture workflow transitions across two orthogonal planes (Coronal front widths + Sagittal side depths) with real-time pose quality gating:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Camera as CameraView (HUD)
+    participant PoseGate as Pose Validity Gate
+    participant Filter as 1€ Temporal Filter
+    participant Audio as Audio/Haptic Engine
+    participant Engine as Anthropometric Engine
+    participant Avatar as Three.js BodyMesh
+
+    User->>Camera: Click "GUIDED SCAN"
+    Camera->>Camera: Enter Stage 1: Front Aligning
+    loop Frame by Frame (30-60 FPS)
+        Camera->>Filter: Stream raw 33D coordinates
+        Filter->>PoseGate: Output jitter-free landmarks
+        PoseGate->>Camera: Alignment State (Yellow/Blue/Green) + Feedback
+    end
+    PoseGate-->>Camera: Status = "Locked" (Quality >= 80%)
+    Camera->>Audio: Trigger 3s countdown ticks (520Hz)
+    Camera->>Audio: Trigger capture chime (880Hz -> 1320Hz)
+    Camera->>Engine: Snapshot Coronal Widths (Biacromial, Bi-iliac, Height)
+
+    Camera->>User: Display prompt: "Turn 90° for side profile"
+    Camera->>Camera: Enter Stage 2: Side Aligning
+    loop Frame by Frame
+        Filter->>PoseGate: Check Sagittal Orientation
+        PoseGate->>Camera: Profile Alignment State + Quality
+    end
+    PoseGate-->>Camera: Profile Status = "Locked" (Quality >= 75%)
+    Camera->>Audio: Trigger 3s countdown ticks
+    Camera->>Audio: Trigger capture chime
+    Camera->>Engine: Snapshot Sagittal Depths (Chest depth, Abdominal depth)
+
+    Engine->>Engine: Dual-Axis Elliptical Integration & Siri/Brožek Regressions
+    Engine->>Camera: Return Complete Anthropometric Profile
+    Engine->>Avatar: Update Morph Targets (X, Y, Z scales)
+    Avatar->>User: Render 3D Anthropometric Twin with Slice Rings
+```
+
+---
+
+## 3. MediaPipe Landmark Topology
 
 MediaPipe BlazePose produces 33 distinct 3D landmarks ($x, y, z \in [0, 1]$ normalized coordinates). MorphoLens uses key anatomical reference points:
 

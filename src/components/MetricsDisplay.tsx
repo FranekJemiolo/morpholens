@@ -10,6 +10,9 @@ import {
   Check,
   Sparkles,
   Sliders,
+  Download,
+  FileSpreadsheet,
+  ShieldCheck,
 } from "lucide-react";
 
 interface MetricsDisplayProps {
@@ -59,7 +62,6 @@ export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
     return `${kg.toFixed(1)} kg`;
   };
 
-  // Determine body fat category
   const getFatCategory = (bf: number) => {
     if (!bf) return { label: "Awaiting Scan", color: "text-slate-400" };
     if (bf < 10)
@@ -71,6 +73,7 @@ export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
 
   const fatCategory = getFatCategory(metrics?.bodyFatPercentage ?? 0);
 
+  // Clipboard text report
   const handleExportSummary = () => {
     if (!metrics) return;
     const report = `=== MORPHOLENS ANTHROPOMETRIC REPORT ===
@@ -78,13 +81,21 @@ Date: ${new Date().toLocaleString()}
 Calibrated Height: ${anchorHeightCm} cm (${formatLength(anchorHeightCm)})
 Estimated Weight: ${formatMass(metrics.estimatedWeightKg)}
 Body Fat: ${metrics.bodyFatPercentage}% (${fatCategory.label})
+  - U.S. Navy Formula: ${metrics.bodyFatNavy}%
+  - Siri Equation: ${metrics.bodyFatSiri}%
+  - Brožek Equation: ${metrics.bodyFatBrozek}%
 Lean Body Mass: ${formatMass(metrics.leanBodyMassKg)}
 Skeletal Muscle Mass: ${formatMass(metrics.skeletalMuscleMassKg)}
 ----------------------------------------
-Biacromial Span (Shoulders): ${formatLength(metrics.shoulderWidthCm)}
-Waist Circumference: ${formatLength(metrics.waistCircumferenceCm)}
-Bi-iliac Span (Hips): ${formatLength(metrics.hipWidthCm)}
-Torso Length: ${formatLength(metrics.torsoLengthCm)}
+Coronal Dimensions:
+  - Biacromial Span (Shoulders): ${formatLength(metrics.shoulderWidthCm)}
+  - Bi-iliac Span (Hips): ${formatLength(metrics.hipWidthCm)}
+  - Waist Width: ${formatLength(metrics.waistWidthCm)}
+Sagittal Dimensions:
+  - Chest Depth: ${formatLength(metrics.chestDepthCm)}
+  - Waist Circumference: ${formatLength(metrics.waistCircumferenceCm)}
+  - Torso Length: ${formatLength(metrics.torsoLengthCm)}
+Analysis Mode: ${metrics.isDualAngle ? "Dual-Angle 3D Fusion" : "Front View Estimation"}
 Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
 ========================================
 100% Client-side AI | github.com/FranekJemiolo/morpholens`;
@@ -93,6 +104,101 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
+  };
+
+  // JSON Export
+  const handleExportJSON = () => {
+    if (!metrics) return;
+    const payload = {
+      generator: "MorphoLens Edge Anthropometric AI",
+      timestamp: new Date().toISOString(),
+      privacyMode: "100% Client-Side WebAssembly / Zero Cloud Storage",
+      anchorHeightCm,
+      isDualAngle: metrics.isDualAngle,
+      units: isImperial ? "imperial" : "metric",
+      composition: {
+        estimatedWeightKg: metrics.estimatedWeightKg,
+        bodyFatPercentage: metrics.bodyFatPercentage,
+        bodyFatNavy: metrics.bodyFatNavy,
+        bodyFatSiri: metrics.bodyFatSiri,
+        bodyFatBrozek: metrics.bodyFatBrozek,
+        leanBodyMassKg: metrics.leanBodyMassKg,
+        skeletalMuscleMassKg: metrics.skeletalMuscleMassKg,
+        classification: fatCategory.label,
+      },
+      measurementsCm: {
+        shoulderWidth: metrics.shoulderWidthCm,
+        chestDepth: metrics.chestDepthCm,
+        waistWidth: metrics.waistWidthCm,
+        waistCircumference: metrics.waistCircumferenceCm,
+        hipWidth: metrics.hipWidthCm,
+        torsoLength: metrics.torsoLengthCm,
+        armLength: metrics.armLengthCm,
+        legLength: metrics.legLengthCm,
+      },
+      confidence: metrics.confidence,
+      frontSnapshot: metrics.frontSnapshot,
+      sideSnapshot: metrics.sideSnapshot,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `morpholens-biometrics-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // CSV Export
+  const handleExportCSV = () => {
+    if (!metrics) return;
+    const headers = [
+      "Timestamp",
+      "AnchorHeightCm",
+      "EstimatedWeightKg",
+      "BodyFatPercent",
+      "BodyFatNavy",
+      "BodyFatSiri",
+      "BodyFatBrozek",
+      "LeanMassKg",
+      "MuscleMassKg",
+      "ShoulderWidthCm",
+      "ChestDepthCm",
+      "WaistCircumferenceCm",
+      "HipWidthCm",
+      "TorsoLengthCm",
+      "IsDualAngle",
+    ];
+
+    const values = [
+      new Date().toISOString(),
+      anchorHeightCm,
+      metrics.estimatedWeightKg,
+      metrics.bodyFatPercentage,
+      metrics.bodyFatNavy,
+      metrics.bodyFatSiri,
+      metrics.bodyFatBrozek,
+      metrics.leanBodyMassKg,
+      metrics.skeletalMuscleMassKg,
+      metrics.shoulderWidthCm,
+      metrics.chestDepthCm,
+      metrics.waistCircumferenceCm,
+      metrics.hipWidthCm,
+      metrics.torsoLengthCm,
+      metrics.isDualAngle ? "true" : "false",
+    ];
+
+    const csvContent = `${headers.join(",")}\n${values.join(",")}\n`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `morpholens-biometrics-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -145,8 +251,8 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
           </div>
         </div>
 
-        {/* Unit Toggle & Export */}
-        <div className="flex items-center space-x-2">
+        {/* Units & Export Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onToggleUnits}
             className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-700 text-xs font-mono transition flex items-center space-x-1.5"
@@ -156,11 +262,41 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
           </button>
 
           <button
+            data-testid="btn-export-json"
+            onClick={handleExportJSON}
+            disabled={!metrics?.poseDetected}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono transition flex items-center space-x-1.5 ${
+              metrics?.poseDetected
+                ? "bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30"
+                : "bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800"
+            }`}
+            title="Export full session to JSON"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>JSON</span>
+          </button>
+
+          <button
+            data-testid="btn-export-csv"
+            onClick={handleExportCSV}
+            disabled={!metrics?.poseDetected}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono transition flex items-center space-x-1.5 ${
+              metrics?.poseDetected
+                ? "bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30"
+                : "bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800"
+            }`}
+            title="Export full session to CSV"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>CSV</span>
+          </button>
+
+          <button
             onClick={handleExportSummary}
             disabled={!metrics?.poseDetected}
             className={`px-3 py-1.5 rounded-lg text-xs font-mono transition flex items-center space-x-1.5 ${
               metrics?.poseDetected
-                ? "bg-cyan-600 hover:bg-cyan-500 text-white"
+                ? "bg-cyan-600 hover:bg-cyan-500 text-white shadow-md"
                 : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
             }`}
           >
@@ -172,7 +308,7 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
             ) : (
               <>
                 <Share2 className="w-3.5 h-3.5" />
-                <span>EXPORT</span>
+                <span>COPY</span>
               </>
             )}
           </button>
@@ -262,9 +398,16 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
 
       {/* Biomechanical Dimensions Breakdown */}
       <div className="glass-panel p-4 rounded-xl border border-slate-800">
-        <div className="flex items-center space-x-2 text-xs font-mono text-cyan-400 mb-3 font-semibold uppercase tracking-wider">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Biomechanical Proportions</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2 text-xs font-mono text-cyan-400 font-semibold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Biomechanical Proportions & Slices</span>
+          </div>
+
+          <div className="flex items-center space-x-1.5 text-[11px] font-mono text-slate-400">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">100% In-Browser Privacy</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -300,7 +443,18 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-center mt-3">
+        <div className="grid grid-cols-3 gap-3 text-center mt-3">
+          <div className="p-2 bg-slate-900/40 rounded-lg border border-slate-800/80">
+            <span className="text-[10px] font-mono text-slate-400 block">
+              CHEST DEPTH (SAGITTAL)
+            </span>
+            <span className="text-xs font-mono font-bold text-slate-300 mt-0.5 block">
+              {metrics?.poseDetected
+                ? formatLength(metrics.chestDepthCm)
+                : "--"}
+            </span>
+          </div>
+
           <div className="p-2 bg-slate-900/40 rounded-lg border border-slate-800/80">
             <span className="text-[10px] font-mono text-slate-400 block">
               ARM LENGTH

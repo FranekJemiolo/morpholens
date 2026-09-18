@@ -8,6 +8,9 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
     error: null,
     isMock: false,
     facingMode: initialFacingMode,
+    videoWidth: 640,
+    videoHeight: 480,
+    aspectRatio: 640 / 480,
   });
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -15,8 +18,30 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
 
   const stopCurrentStream = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          // ignore
+        }
+      });
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const handleLoadedMetadata = useCallback(() => {
+    if (videoRef.current) {
+      const w = videoRef.current.videoWidth || 640;
+      const h = videoRef.current.videoHeight || 480;
+      setState((prev) => ({
+        ...prev,
+        videoWidth: w,
+        videoHeight: h,
+        aspectRatio: w / h,
+      }));
     }
   }, []);
 
@@ -32,6 +57,9 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
           error: null,
           isMock: true,
           facingMode: facing,
+          videoWidth: 640,
+          videoHeight: 480,
+          aspectRatio: 640 / 480,
         }));
         return;
       }
@@ -63,11 +91,17 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
           await navigator.mediaDevices.getUserMedia(constraints);
         streamRef.current = mediaStream;
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-          await videoRef.current.play().catch((playErr) => {
-            console.warn("Video auto-play interrupted:", playErr);
-          });
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = mediaStream;
+          video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+          video.addEventListener("loadedmetadata", handleLoadedMetadata);
+
+          try {
+            await video.play();
+          } catch (playErr) {
+            console.warn("Video play interrupted:", playErr);
+          }
         }
 
         setState({
@@ -76,6 +110,9 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
           error: null,
           isMock: false,
           facingMode: facing,
+          videoWidth: video?.videoWidth || 640,
+          videoHeight: video?.videoHeight || 480,
+          aspectRatio: (video?.videoWidth || 640) / (video?.videoHeight || 480),
         });
       } catch (err: unknown) {
         let errorMessage = "Unable to access webcam.";
@@ -120,10 +157,13 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
           error: errorMessage,
           isMock: false,
           facingMode: facing,
+          videoWidth: 640,
+          videoHeight: 480,
+          aspectRatio: 640 / 480,
         });
       }
     },
-    [stopCurrentStream],
+    [stopCurrentStream, handleLoadedMetadata],
   );
 
   useEffect(() => {

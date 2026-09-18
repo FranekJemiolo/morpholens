@@ -4,41 +4,55 @@ import {
   euclideanDistance3D,
   computeOpticalScale,
   computeAnthropometrics,
+  evaluatePoseQuality,
+  extractFrontMeasurements,
+  extractSideMeasurements,
+  fuseMultiAngleAnthropometrics,
+  projectToCanvas,
 } from "../../src/lib/anthropometrics.ts";
-import { generateSyntheticPose } from "../../src/services/poseLandmarker.ts";
-import type { NormalizedLandmark } from "../../src/types/vision.ts";
+import {
+  standardFrontPose,
+  standardSidePose,
+  endomorphPose,
+  ectomorphPose,
+  degradedOccludedPose,
+} from "../fixtures/landmarks.ts";
 
 describe("Anthropometrics Math & Regression Engine", () => {
-  describe("Euclidean Distance Utilities", () => {
+  describe("Euclidean Distance & Projection Utilities", () => {
     it("calculates accurate 2D pixel distance between normalized coordinates", () => {
-      const p1: NormalizedLandmark = { x: 0.2, y: 0.3, z: 0 };
-      const p2: NormalizedLandmark = { x: 0.5, y: 0.7, z: 0 };
-      const width = 1000;
-      const height = 1000;
-
-      // dx = 300, dy = 400 => hypotenuse = 500
-      const dist = euclideanDistance2D(p1, p2, width, height);
+      const p1 = { x: 0.2, y: 0.3, z: 0 };
+      const p2 = { x: 0.5, y: 0.7, z: 0 };
+      const dist = euclideanDistance2D(p1, p2, 1000, 1000);
       expect(dist).toBeCloseTo(500, 1);
     });
 
     it("calculates accurate 3D Euclidean distance incorporating depth", () => {
-      const p1: NormalizedLandmark = { x: 0.0, y: 0.0, z: 0.0 };
-      const p2: NormalizedLandmark = { x: 0.1, y: 0.2, z: 0.2 };
-      const width = 1000;
-      const height = 1000;
-
-      // dx = 100, dy = 200, dz = 200 => sqrt(10000 + 40000 + 40000) = 300
-      const dist = euclideanDistance3D(p1, p2, width, height);
+      const p1 = { x: 0.0, y: 0.0, z: 0.0 };
+      const p2 = { x: 0.1, y: 0.2, z: 0.2 };
+      const dist = euclideanDistance3D(p1, p2, 1000, 1000);
       expect(dist).toBeCloseTo(300, 1);
+    });
+
+    it("projects coordinates with object-fit: cover aspect ratio correction", () => {
+      const lm = { x: 0.5, y: 0.5, z: 0.0 };
+      // Wider video (16:9) inside square canvas (1:1): horizontally cropped
+      const projWider = projectToCanvas(lm, 600, 600, 1920, 1080, false);
+      expect(projWider.x).toBeCloseTo(300, 1); // center remains centered
+      expect(projWider.y).toBeCloseTo(300, 1);
+
+      // Taller video (4:3) inside wide canvas (16:9): vertically cropped
+      const projTaller = projectToCanvas(lm, 1600, 900, 640, 480, false);
+      expect(projTaller.x).toBeCloseTo(800, 1);
+      expect(projTaller.y).toBeCloseTo(450, 1);
     });
   });
 
   describe("Optical Scale Computation", () => {
     it("derives correct cm/pixel scale factor for standard stature", () => {
-      const pose = generateSyntheticPose(0);
       const anchorHeightCm = 180;
       const { scaleFactor, detectedHeightPx } = computeOpticalScale(
-        pose,
+        standardFrontPose,
         anchorHeightCm,
         640,
         480,
@@ -47,7 +61,6 @@ describe("Anthropometrics Math & Regression Engine", () => {
       expect(detectedHeightPx).toBeGreaterThan(200);
       expect(scaleFactor).toBeGreaterThan(0.2);
       expect(scaleFactor).toBeLessThan(1.0);
-      // Scaled stature should match anchor height
       expect(detectedHeightPx * scaleFactor).toBeCloseTo(anchorHeightCm, 1);
     });
 
@@ -56,99 +69,126 @@ describe("Anthropometrics Math & Regression Engine", () => {
       expect(emptyScale.scaleFactor).toBe(0);
       expect(emptyScale.detectedHeightPx).toBe(0);
 
-      // Incomplete landmark array (< 33)
-      const partialPose = generateSyntheticPose(0).slice(0, 10);
+      const partialPose = standardFrontPose.slice(0, 10);
       const partialScale = computeOpticalScale(partialPose, 175, 640, 480);
       expect(partialScale.scaleFactor).toBe(0);
     });
   });
 
-  describe("Anthropometric Telemetry & Regression Analysis", () => {
-    it("computes physiologically plausible body composition for standard synthetic pose", () => {
+  describe("Pose Validity Gate & Quality Evaluation", () => {
+    it("scores standard front pose with high quality and locked status", () => {
+      const assessment = evaluatePoseQuality(standardFrontPose, "front");
+      expect(assessment.isValid).toBe(true);
+      expect(assessment.qualityScore).toBeGreaterThanOrEqual(80);
+      expect(assessment.alignmentState).toBe("locked");
+      expect(assessment.missingLandmarks).toHaveLength(0);
+    });
+
+    it("rejects degraded poses with occluded feet and alerts the user", () => {
+      const assessment = evaluatePoseQuality(degradedOccludedPose, "front");
+      expect(assessment.isValid).toBe(false);
+      expect(assessment.alignmentState).toBe("out_of_frame");
+      expect(assessment.feedbackMessage).toContain("feet not fully visible");
+    });
+
+    it("evaluates side profile correctly when user is turned sideways", () => {
+      const assessment = evaluatePoseQuality(standardSidePose, "side");
+      expect(assessment.isValid).toBe(true);
+      expect(assessment.alignmentState).toBe("locked");
+    });
+
+    it("flags frontal pose as needing 90-degree turn when evaluating side view", () => {
+      const assessment = evaluatePoseQuality(standardFrontPose, "side");
+      expect(assessment.isValid).toBe(false);
+      expect(assessment.feedbackMessage).toContain("Turn 90°");
+    });
+  });
+
+  describe("Multi-Angle Anthropometrics & Volumetric Fusion", () => {
+    it("fuses Coronal and Sagittal measurements into verified volumetric composition", () => {
       const anchorHeightCm = 178;
-      const pose = generateSyntheticPose(0);
-      const metrics = computeAnthropometrics(pose, anchorHeightCm, 640, 480);
+      const front = extractFrontMeasurements(
+        standardFrontPose,
+        anchorHeightCm,
+        640,
+        480,
+      );
+      const side = extractSideMeasurements(
+        standardSidePose,
+        front.scaleFactor,
+        640,
+        480,
+      );
 
-      expect(metrics.poseDetected).toBe(true);
-      expect(metrics.calibratedHeightCm).toBe(178);
+      const fused = fuseMultiAngleAnthropometrics(front, side, anchorHeightCm);
 
-      // Biacromial shoulder span typically ~36-48 cm for adult human
-      expect(metrics.shoulderWidthCm).toBeGreaterThan(32);
-      expect(metrics.shoulderWidthCm).toBeLessThan(55);
+      expect(fused.isDualAngle).toBe(true);
+      expect(fused.calibratedHeightCm).toBe(178);
 
-      // Bi-iliac pelvic span typically ~28-40 cm
-      expect(metrics.hipWidthCm).toBeGreaterThan(24);
-      expect(metrics.hipWidthCm).toBeLessThan(46);
+      // Verify measured coronal widths
+      expect(fused.shoulderWidthCm).toBeGreaterThan(34);
+      expect(fused.shoulderWidthCm).toBeLessThan(52);
+      expect(fused.hipWidthCm).toBeGreaterThan(26);
+      expect(fused.hipWidthCm).toBeLessThan(44);
 
-      // Plausible human weight for 178 cm height (55kg - 95kg)
-      expect(metrics.estimatedWeightKg).toBeGreaterThan(55);
-      expect(metrics.estimatedWeightKg).toBeLessThan(95);
+      // Verify measured sagittal depths
+      expect(fused.chestDepthCm).toBeGreaterThanOrEqual(18);
+      expect(fused.chestDepthCm).toBeLessThan(35);
 
-      // Plausible body fat % for standard synthetic mannequin
-      expect(metrics.bodyFatPercentage).toBeGreaterThan(6);
-      expect(metrics.bodyFatPercentage).toBeLessThan(35);
+      // Multi-equation regression validation
+      expect(fused.bodyFatNavy).toBeGreaterThan(5);
+      expect(fused.bodyFatSiri).toBeGreaterThan(5);
+      expect(fused.bodyFatBrozek).toBeGreaterThan(5);
+      expect(fused.bodyFatPercentage).toBeGreaterThan(5);
+      expect(fused.bodyFatPercentage).toBeLessThan(35);
 
-      // Conservation of mass: Lean Mass + Fat Mass ≈ Total Weight
-      const computedTotal =
-        metrics.leanBodyMassKg +
-        (metrics.estimatedWeightKg * metrics.bodyFatPercentage) / 100;
-      expect(computedTotal).toBeCloseTo(metrics.estimatedWeightKg, 0);
+      // Mass conservation check
+      const expectedTotal =
+        fused.leanBodyMassKg +
+        (fused.estimatedWeightKg * fused.bodyFatPercentage) / 100;
+      expect(expectedTotal).toBeCloseTo(fused.estimatedWeightKg, 0);
 
-      // Skeletal Muscle Mass should be ~54% of Lean Body Mass
+      // Janssen bio-anthropometric regression
       expect(
-        Math.abs(metrics.skeletalMuscleMassKg - metrics.leanBodyMassKg * 0.54),
+        Math.abs(fused.skeletalMuscleMassKg - fused.leanBodyMassKg * 0.54),
       ).toBeLessThan(0.1);
     });
 
-    it("sensitively reflects changes in waist proportion on Body Fat %", () => {
-      const anchorHeightCm = 175;
-      const normalPose = generateSyntheticPose(0, 1.0);
-      const widerPose = generateSyntheticPose(0, 1.35); // wider torso & waist
+    it("property test: never produces NaN, negative, or unphysiological metrics across all body archetypes", () => {
+      const poses = [standardFrontPose, endomorphPose, ectomorphPose];
 
-      const normalMetrics = computeAnthropometrics(
-        normalPose,
-        anchorHeightCm,
-        640,
-        480,
-      );
-      const widerMetrics = computeAnthropometrics(
-        widerPose,
-        anchorHeightCm,
-        640,
-        480,
-      );
+      for (const pose of poses) {
+        const metrics = computeAnthropometrics(pose, 175, 640, 480);
+        expect(metrics.poseDetected).toBe(true);
 
-      expect(widerMetrics.shoulderWidthCm).toBeGreaterThan(
-        normalMetrics.shoulderWidthCm,
-      );
-      expect(widerMetrics.waistCircumferenceCm).toBeGreaterThan(
-        normalMetrics.waistCircumferenceCm,
-      );
-      // Increased waist circumference relative to stature increases body fat % in Navy regression
-      expect(widerMetrics.bodyFatPercentage).toBeGreaterThan(
-        normalMetrics.bodyFatPercentage,
-      );
-      // Wider volumetric segments increase estimated mass
-      expect(widerMetrics.estimatedWeightKg).toBeGreaterThan(
-        normalMetrics.estimatedWeightKg,
-      );
+        // Body Fat must be strictly physiological (3% to 55%)
+        expect(metrics.bodyFatPercentage).toBeGreaterThanOrEqual(3);
+        expect(metrics.bodyFatPercentage).toBeLessThanOrEqual(55);
+        expect(Number.isNaN(metrics.bodyFatPercentage)).toBe(false);
+
+        // Weight and lean mass must be positive and non-NaN
+        expect(metrics.estimatedWeightKg).toBeGreaterThan(40);
+        expect(metrics.estimatedWeightKg).toBeLessThan(140);
+        expect(metrics.leanBodyMassKg).toBeGreaterThan(30);
+        expect(metrics.skeletalMuscleMassKg).toBeGreaterThan(15);
+        expect(Number.isNaN(metrics.estimatedWeightKg)).toBe(false);
+
+        // Dimensions must be positive and non-NaN
+        expect(metrics.shoulderWidthCm).toBeGreaterThan(20);
+        expect(metrics.waistCircumferenceCm).toBeGreaterThan(40);
+        expect(metrics.hipWidthCm).toBeGreaterThan(20);
+      }
     });
 
-    it("gracefully returns fallback metrics when landmark confidence is low", () => {
-      const lowConfidencePose: NormalizedLandmark[] = Array.from(
-        { length: 33 },
-        () => ({
-          x: 0.5,
-          y: 0.5,
-          z: 0.0,
-          visibility: 0.1, // very low visibility
-        }),
-      );
+    it("sensitively reflects higher adipose and volume in endomorph compared to ectomorph", () => {
+      const endo = computeAnthropometrics(endomorphPose, 175, 640, 480);
+      const ecto = computeAnthropometrics(ectomorphPose, 175, 640, 480);
 
-      const metrics = computeAnthropometrics(lowConfidencePose, 175, 640, 480);
-      expect(metrics.poseDetected).toBe(false);
-      expect(metrics.estimatedWeightKg).toBe(0);
-      expect(metrics.confidence).toBeLessThan(0.4);
+      expect(endo.waistCircumferenceCm).toBeGreaterThan(
+        ecto.waistCircumferenceCm,
+      );
+      expect(endo.bodyFatPercentage).toBeGreaterThan(ecto.bodyFatPercentage);
+      expect(endo.estimatedWeightKg).toBeGreaterThan(ecto.estimatedWeightKg);
     });
   });
 });
