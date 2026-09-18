@@ -211,8 +211,8 @@ export function generateSyntheticPose(
   landmarks[9] = { x: 0.485 + sway, y: 0.205, z: -0.04, visibility: 0.9 };
   landmarks[10] = { x: 0.515 + sway, y: 0.205, z: -0.04, visibility: 0.9 };
 
-  // Shoulders (11, 12)
-  const shoulderHalfSpan = 0.12 * poseFactor;
+  // Shoulders (11, 12) - anatomically scaled to standard aspect ratio
+  const shoulderHalfSpan = 0.075 * poseFactor;
   landmarks[11] = {
     x: 0.5 - shoulderHalfSpan + sway,
     y: 0.28 - breath,
@@ -228,13 +228,13 @@ export function generateSyntheticPose(
 
   // Elbows (13, 14)
   landmarks[13] = {
-    x: 0.34 + sway,
+    x: 0.38 + sway,
     y: 0.42,
     z: 0.04,
     visibility: 0.95,
   };
   landmarks[14] = {
-    x: 0.66 + sway,
+    x: 0.62 + sway,
     y: 0.42,
     z: 0.04,
     visibility: 0.95,
@@ -242,13 +242,13 @@ export function generateSyntheticPose(
 
   // Wrists (15, 16)
   landmarks[15] = {
-    x: 0.32 + sway,
+    x: 0.36 + sway,
     y: 0.55,
     z: 0.08,
     visibility: 0.95,
   };
   landmarks[16] = {
-    x: 0.68 + sway,
+    x: 0.64 + sway,
     y: 0.55,
     z: 0.08,
     visibility: 0.95,
@@ -258,7 +258,7 @@ export function generateSyntheticPose(
   for (let i = 17; i <= 22; i++) {
     const isLeft = i % 2 === 1;
     landmarks[i] = {
-      x: isLeft ? 0.31 + sway : 0.69 + sway,
+      x: isLeft ? 0.35 + sway : 0.65 + sway,
       y: 0.58 + (i % 3) * 0.015,
       z: 0.08,
       visibility: 0.9,
@@ -266,7 +266,7 @@ export function generateSyntheticPose(
   }
 
   // Pelvis / Hips (23, 24)
-  const hipHalfSpan = 0.085 * poseFactor;
+  const hipHalfSpan = 0.055 * poseFactor;
   landmarks[23] = {
     x: 0.5 - hipHalfSpan + sway * 0.7,
     y: 0.52,
@@ -282,13 +282,13 @@ export function generateSyntheticPose(
 
   // Knees (25, 26)
   landmarks[25] = {
-    x: 0.43 + sway * 0.4,
+    x: 0.45 + sway * 0.4,
     y: 0.7,
     z: 0.02,
     visibility: 0.97,
   };
   landmarks[26] = {
-    x: 0.57 + sway * 0.4,
+    x: 0.55 + sway * 0.4,
     y: 0.7,
     z: 0.02,
     visibility: 0.97,
@@ -296,13 +296,13 @@ export function generateSyntheticPose(
 
   // Ankles (27, 28)
   landmarks[27] = {
-    x: 0.44 + sway * 0.2,
+    x: 0.46 + sway * 0.2,
     y: 0.88,
     z: 0.0,
     visibility: 0.98,
   };
   landmarks[28] = {
-    x: 0.56 + sway * 0.2,
+    x: 0.54 + sway * 0.2,
     y: 0.88,
     z: 0.0,
     visibility: 0.98,

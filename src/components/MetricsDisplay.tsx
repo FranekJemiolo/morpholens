@@ -182,7 +182,10 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
       {/* Primary 4 Metric Cards */}
       <div className="grid grid-cols-2 gap-3">
         {/* Total Weight */}
-        <div className="glass-panel p-4 rounded-xl border border-cyan-500/20 hover:border-cyan-500/40 transition">
+        <div
+          data-testid="card-weight"
+          className="glass-panel p-4 rounded-xl border border-cyan-500/20 hover:border-cyan-500/40 transition"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono text-slate-400">
               EST. WEIGHT
@@ -200,7 +203,10 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
         </div>
 
         {/* Body Fat % */}
-        <div className="glass-panel p-4 rounded-xl border border-emerald-500/20 hover:border-emerald-500/40 transition">
+        <div
+          data-testid="card-bodyfat"
+          className="glass-panel p-4 rounded-xl border border-emerald-500/20 hover:border-emerald-500/40 transition"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono text-slate-400">BODY FAT %</span>
             <Flame className="w-4 h-4 text-emerald-400" />
@@ -216,7 +222,10 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
         </div>
 
         {/* Skeletal Muscle Mass */}
-        <div className="glass-panel p-4 rounded-xl border border-sky-500/20 hover:border-sky-500/40 transition">
+        <div
+          data-testid="card-muscle"
+          className="glass-panel p-4 rounded-xl border border-sky-500/20 hover:border-sky-500/40 transition"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono text-slate-400">
               MUSCLE MASS
@@ -234,7 +243,10 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
         </div>
 
         {/* Lean Body Mass */}
-        <div className="glass-panel p-4 rounded-xl border border-violet-500/20 hover:border-violet-500/40 transition">
+        <div
+          data-testid="card-lean"
+          className="glass-panel p-4 rounded-xl border border-violet-500/20 hover:border-violet-500/40 transition"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono text-slate-400">LEAN MASS</span>
             <HeartPulse className="w-4 h-4 text-violet-400" />

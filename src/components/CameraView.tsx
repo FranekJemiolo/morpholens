@@ -308,6 +308,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
         {/* Camera controls */}
         <div className="flex items-center space-x-2">
           <button
+            data-testid="btn-simulate"
             onClick={onToggleMock}
             title={isMock ? "Switch to Live Camera" : "Simulate / Test Feed"}
             className={`px-2.5 py-1 rounded-md text-xs font-mono border transition flex items-center space-x-1 ${
@@ -362,6 +363,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
               Retry
             </button>
             <button
+              data-testid="btn-simulate-error"
               onClick={onToggleMock}
               className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-mono transition flex items-center space-x-1"
             >

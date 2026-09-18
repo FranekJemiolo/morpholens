@@ -239,23 +239,23 @@ export function computeAnthropometrics(
   const tissueDensityKgPerL = 1.055;
 
   // Cylindrical/Ellipsoidal Segment volumes (in Liters, dm³)
-  // Head volume: ellipsoid 4/3 * π * r1 * r2 * r3
+  // Head volume: ellipsoid 4/3 * π * r1 * r2 * r3 (~4.18 L)
   const headRadiusCm = 10;
-  const headVolL = ((4 / 3) * Math.PI * Math.pow(headRadiusCm, 3)) / 1000; // ~4.18 L
+  const headVolL = ((4 / 3) * Math.PI * Math.pow(headRadiusCm, 3)) / 1000;
 
   // Torso volume: elliptical cylinder π * a * b * h
-  const torsoRadiusA = shoulderWidthCm * 0.42;
-  const torsoRadiusB = chestDepthCm * 0.42;
+  const torsoRadiusA = shoulderWidthCm * 0.44;
+  const torsoRadiusB = chestDepthCm * 0.45;
   const torsoVolL =
     (Math.PI * torsoRadiusA * torsoRadiusB * torsoLengthCm) / 1000;
 
   // Arms volume (both arms as frustum cylinders)
-  const armRadiusCm = shoulderWidthCm * 0.11;
+  const armRadiusCm = shoulderWidthCm * 0.13;
   const armsVolL =
     (2 * Math.PI * Math.pow(armRadiusCm, 2) * armLengthCm) / 1000;
 
   // Legs volume (both legs as frustum cylinders)
-  const legRadiusCm = hipWidthCm * 0.22;
+  const legRadiusCm = hipWidthCm * 0.24;
   const legsVolL =
     (2 * Math.PI * Math.pow(legRadiusCm, 2) * legLengthCm) / 1000;
 
@@ -264,9 +264,9 @@ export function computeAnthropometrics(
   let estimatedWeightKg = totalVolumeL * tissueDensityKgPerL;
 
   // Calibration against normative BMI bounds for standing height
-  // Ensure weight is within plausible human range for height (BMI 16 - 38)
+  // Ensure weight is within plausible human range for height (BMI 17 - 38)
   const heightM = anchorHeightCm / 100;
-  const minPlausibleWeight = 16 * heightM * heightM;
+  const minPlausibleWeight = 17 * heightM * heightM;
   const maxPlausibleWeight = 38 * heightM * heightM;
   estimatedWeightKg = Math.min(
     maxPlausibleWeight,

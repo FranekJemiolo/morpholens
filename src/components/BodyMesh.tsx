@@ -308,11 +308,13 @@ export const BodyMesh: React.FC<BodyMeshProps> = ({
 
     // 7. Animation Loop with smooth damping
     let animId: number;
-    let clock = new THREE.Clock();
+    let lastFrameTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
+      const now = performance.now();
+      const delta = Math.min(0.1, (now - lastFrameTime) / 1000);
+      lastFrameTime = now;
 
       // Gentle ambient idle rotation if user is not actively interacting
       if (!isDraggingRef.current && avatarGroupRef.current) {
