@@ -28,6 +28,9 @@ interface CameraViewProps {
   samplePresetId: string | null;
   sampleImageUrl: string | null;
   onSelectSample: (presetId: string | null, customUrl?: string) => void;
+  onImageLoad?: (width: number, height: number) => void;
+  customOrientation?: "front" | "side";
+  onToggleCustomOrientation?: () => void;
   landmarks: NormalizedLandmark[] | null;
   confidence: number;
   fps: number;
@@ -55,6 +58,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
   samplePresetId,
   sampleImageUrl,
   onSelectSample,
+  onImageLoad,
+  customOrientation,
+  onToggleCustomOrientation,
   landmarks,
   confidence: _confidence,
   fps,
@@ -76,6 +82,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [showSampleMenu, setShowSampleMenu] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Render skeleton HUD and dynamic viewport silhouette guide over video
@@ -324,30 +331,74 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [landmarks, isMock, metrics, videoWidth, videoHeight, quality]);
+  }, [
+    landmarks,
+    isMock,
+    metrics,
+    videoWidth,
+    videoHeight,
+    quality,
+    sampleImageUrl,
+    facingMode,
+  ]);
 
   const isGuidedMode = captureStage !== "idle" && captureStage !== "completed";
   const activePreset = SAMPLE_HUMANS.find((s) => s.id === samplePresetId);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && file.type.startsWith("image/")) {
       const url = URL.createObjectURL(file);
       onSelectSample("custom", url);
       setShowSampleMenu(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      onSelectSample("custom", url);
     }
   };
 
   return (
-    <div className="relative w-full aspect-[4/3] md:aspect-[16/10] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl flex flex-col">
-      {/* Live Video Mirror or Sample Human Subject */}
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="relative w-full aspect-[4/3] md:aspect-[16/10] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl flex flex-col"
+    >
+      {/* Live Video Mirror or Sample/Uploaded Human Subject */}
       {sampleImageUrl ? (
         <img
           ref={sampleImageRef}
           src={sampleImageUrl}
           alt="Human Test Subject"
           crossOrigin="anonymous"
-          className="absolute inset-0 w-full h-full object-cover"
+          onLoad={(e) =>
+            onImageLoad?.(
+              e.currentTarget.naturalWidth,
+              e.currentTarget.naturalHeight,
+            )
+          }
+          className="absolute inset-0 w-full h-full object-cover select-none"
         />
       ) : (
         <video
@@ -361,6 +412,21 @@ export const CameraView: React.FC<CameraViewProps> = ({
         />
       )}
 
+      {/* Drag & Drop Visual Backdrop Highlight */}
+      {isDragging && (
+        <div className="absolute inset-0 z-40 bg-cyan-950/90 backdrop-blur-md border-2 border-dashed border-cyan-400 flex flex-col items-center justify-center p-6 text-center animate-pulse">
+          <div className="p-4 bg-cyan-500/20 rounded-full border border-cyan-400 mb-3 text-cyan-300">
+            <Upload className="w-8 h-8 animate-bounce" />
+          </div>
+          <p className="text-base font-mono font-bold text-cyan-200">
+            Drop Full-Body Photo Here to Analyze
+          </p>
+          <p className="text-xs font-mono text-cyan-400/80 mt-1">
+            JPEG, PNG, or WebP • 100% Client-Side Private
+          </p>
+        </div>
+      )}
+
       {/* Canvas HUD Overlay */}
       <canvas
         ref={canvasRef}
@@ -371,7 +437,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
       <div className="absolute inset-0 scanline pointer-events-none opacity-40 z-10" />
 
       {/* Top HUD Status Bar */}
-      <div className="relative z-20 flex items-center justify-between p-3 bg-gradient-to-b from-slate-950/85 via-slate-950/40 to-transparent">
+      <div className="relative z-30 flex items-center justify-between p-3 bg-gradient-to-b from-slate-950/85 via-slate-950/40 to-transparent">
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-slate-900/80 rounded-md border border-cyan-500/20 text-xs font-mono">
             <span
@@ -385,12 +451,16 @@ export const CameraView: React.FC<CameraViewProps> = ({
             />
             <span className="text-slate-300 font-medium">
               {landmarks
-                ? sampleImageUrl
-                  ? "HUMAN DETECTED"
-                  : "TRACKING ACTIVE"
-                : isMock
-                  ? "SIMULATION"
-                  : "STANDBY"}
+                ? samplePresetId === "custom"
+                  ? "PHOTO ANALYZED"
+                  : sampleImageUrl
+                    ? "HUMAN DETECTED"
+                    : "TRACKING ACTIVE"
+                : sampleImageUrl
+                  ? "ANALYZING PHOTO..."
+                  : isMock
+                    ? "SIMULATION"
+                    : "STANDBY"}
             </span>
           </div>
 
@@ -415,7 +485,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
           )}
         </div>
 
-        {/* Camera and Scan Flow Controls */}
+        {/* Camera, Upload, and Scan Flow Controls */}
         <div className="flex items-center space-x-2">
           {captureStage === "idle" ? (
             <button
@@ -442,6 +512,46 @@ export const CameraView: React.FC<CameraViewProps> = ({
             </button>
           )}
 
+          {/* Dedicated Direct Upload Photo Button */}
+          <button
+            data-testid="btn-upload-photo"
+            onClick={() => fileInputRef.current?.click()}
+            title="Upload your own full-body image"
+            className={`px-2.5 py-1 rounded-md text-xs font-mono border transition flex items-center space-x-1.5 ${
+              samplePresetId === "custom"
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-neon"
+                : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
+            }`}
+          >
+            <Upload className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">
+              {samplePresetId === "custom" ? "UPLOADED" : "UPLOAD"}
+            </span>
+          </button>
+          <input
+            ref={fileInputRef}
+            data-testid="input-file-upload"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          {/* Orientation Toggle for Custom Uploaded Photo */}
+          {samplePresetId === "custom" && onToggleCustomOrientation && (
+            <button
+              data-testid="btn-toggle-custom-angle"
+              onClick={onToggleCustomOrientation}
+              title="Toggle Front standing view vs Side profile view"
+              className="px-2.5 py-1 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 rounded-md text-xs font-mono transition flex items-center space-x-1"
+            >
+              <span className="text-[10px] text-slate-400">ANGLE:</span>
+              <span className="font-bold uppercase">
+                {customOrientation || "front"}
+              </span>
+            </button>
+          )}
+
           {/* Sample Human Test Subjects Selector */}
           <div className="relative">
             <button
@@ -449,18 +559,14 @@ export const CameraView: React.FC<CameraViewProps> = ({
               onClick={() => setShowSampleMenu((prev) => !prev)}
               title="Test with Generated Human Photos"
               className={`px-2.5 py-1 rounded-md text-xs font-mono border transition flex items-center space-x-1.5 ${
-                samplePresetId
+                samplePresetId && samplePresetId !== "custom"
                   ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
                   : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
               }`}
             >
               <Users className="w-3.5 h-3.5 text-cyan-400" />
               <span className="hidden sm:inline">
-                {activePreset
-                  ? activePreset.name
-                  : samplePresetId === "custom"
-                    ? "Custom Image"
-                    : "SAMPLE HUMANS"}
+                {activePreset ? activePreset.name : "SAMPLES"}
               </span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
@@ -491,22 +597,18 @@ export const CameraView: React.FC<CameraViewProps> = ({
                   </button>
                 ))}
 
-                <label
-                  data-testid="btn-sample-upload"
+                <button
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setShowSampleMenu(false);
+                  }}
                   className="w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
                 >
                   <span className="flex items-center space-x-1.5">
                     <Upload className="w-3 h-3 text-cyan-400" />
-                    <span>Upload Custom Image</span>
+                    <span>Upload Custom Photo</span>
                   </span>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                </label>
+                </button>
 
                 {samplePresetId && (
                   <button
@@ -576,12 +678,15 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
       )}
 
-      {/* Countdown Overlay during auto-capture */}
+      {/* Countdown Overlay */}
       {countdown !== null && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/30 pointer-events-none">
-          <div className="w-24 h-24 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center backdrop-blur-md animate-ping">
-            <span className="text-5xl font-extrabold font-mono text-cyan-300">
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm pointer-events-none">
+          <div className="flex flex-col items-center animate-bounce">
+            <span className="text-7xl md:text-8xl font-black font-mono text-cyan-400 drop-shadow-[0_0_25px_rgba(56,189,248,0.8)]">
               {countdown}
+            </span>
+            <span className="text-sm font-mono text-cyan-200 mt-2 tracking-widest uppercase">
+              Capturing pose...
             </span>
           </div>
         </div>
@@ -621,8 +726,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
       )}
 
       {/* Loading Overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-sm">
+      {isLoading && !isMock && !sampleImageUrl && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-sm pointer-events-none">
           <div className="p-3 bg-cyan-500/10 rounded-full border border-cyan-500/30 mb-3 animate-spin">
             <RefreshCw className="w-6 h-6 text-cyan-400" />
           </div>
@@ -636,7 +741,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
       )}
 
       {/* Error Banner */}
-      {error && !isMock && (
+      {error && !isMock && !sampleImageUrl && (
         <div className="absolute inset-x-4 bottom-4 z-30 p-4 bg-red-950/90 border border-red-500/50 rounded-xl backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-red-200">
           <div className="flex items-center space-x-3">
             <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
@@ -650,12 +755,20 @@ export const CameraView: React.FC<CameraViewProps> = ({
               Retry
             </button>
             <button
+              data-testid="btn-upload-error"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-mono transition flex items-center space-x-1"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Photo</span>
+            </button>
+            <button
               data-testid="btn-sample-fallback"
               onClick={() => onSelectSample("male-front")}
               className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-mono transition flex items-center space-x-1"
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Sample Human</span>
+              <span>Sample</span>
             </button>
             <button
               data-testid="btn-simulate-error"
@@ -669,19 +782,45 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
       )}
 
-      {/* Standby Hint */}
+      {/* Standby Hero Center Card */}
       {!isLoading &&
         !error &&
         !landmarks &&
         !isMock &&
         !isGuidedMode &&
         !sampleImageUrl && (
-          <div className="absolute inset-x-0 bottom-4 z-20 flex justify-center pointer-events-none">
-            <div className="px-4 py-2 bg-slate-900/85 backdrop-blur-md rounded-full border border-cyan-500/20 text-xs font-mono text-slate-300 flex items-center space-x-2 shadow-neon">
-              <Users className="w-4 h-4 text-cyan-400 animate-pulse" />
-              <span>
-                Select a Sample Human subject above or step into camera frame
-              </span>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 pt-16 pointer-events-none">
+            <div className="max-w-md w-full p-6 bg-slate-950/90 backdrop-blur-xl rounded-2xl border border-cyan-500/30 text-center shadow-2xl flex flex-col items-center space-y-4 pointer-events-auto">
+              <div className="p-3.5 bg-cyan-500/10 rounded-2xl border border-cyan-500/30 text-cyan-400 shadow-neon">
+                <Upload className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-100 font-mono tracking-wide">
+                  ANALYZE FULL-BODY PHOTO
+                </h3>
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed font-sans">
+                  Upload your own photo or drag & drop anywhere. 100%
+                  client-side WebAssembly inference — zero cloud compute.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full pt-1">
+                <button
+                  data-testid="btn-standby-upload"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full sm:flex-1 py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold rounded-xl text-xs font-mono transition flex items-center justify-center space-x-2 shadow-neon cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Upload Photo</span>
+                </button>
+                <button
+                  data-testid="btn-standby-sample"
+                  onClick={() => onSelectSample("male-front")}
+                  className="w-full sm:flex-1 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-cyan-300 border border-slate-700 rounded-xl text-xs font-mono transition flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <Users className="w-4 h-4 text-cyan-400" />
+                  <span>Sample Subject</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

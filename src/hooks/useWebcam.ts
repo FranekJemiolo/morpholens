@@ -15,6 +15,7 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const requestIdRef = useRef(0);
 
   const stopCurrentStream = useCallback(() => {
     if (streamRef.current) {
@@ -47,6 +48,7 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
 
   const startCamera = useCallback(
     async (facing: "user" | "environment", useMock = false) => {
+      const currentRequestId = ++requestIdRef.current;
       stopCurrentStream();
 
       if (useMock) {
@@ -89,6 +91,12 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
 
         const mediaStream =
           await navigator.mediaDevices.getUserMedia(constraints);
+
+        if (requestIdRef.current !== currentRequestId) {
+          mediaStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
         streamRef.current = mediaStream;
 
         const video = videoRef.current;
@@ -104,6 +112,10 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
           }
         }
 
+        if (requestIdRef.current !== currentRequestId) {
+          return;
+        }
+
         setState({
           stream: mediaStream,
           isLoading: false,
@@ -115,6 +127,10 @@ export function useWebcam(initialFacingMode: "user" | "environment" = "user") {
           aspectRatio: (video?.videoWidth || 640) / (video?.videoHeight || 480),
         });
       } catch (err: unknown) {
+        if (requestIdRef.current !== currentRequestId) {
+          return;
+        }
+
         let errorMessage = "Unable to access webcam.";
 
         if (err instanceof DOMException) {

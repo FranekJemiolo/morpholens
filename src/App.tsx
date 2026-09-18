@@ -62,6 +62,13 @@ export default function App(): React.JSX.Element {
   // Sample Human Presets
   const [samplePresetId, setSamplePresetId] = useState<string | null>(null);
   const [sampleImageUrl, setSampleImageUrl] = useState<string | null>(null);
+  const [customOrientation, setCustomOrientation] = useState<"front" | "side">(
+    "front",
+  );
+  const [sampleDimensions, setSampleDimensions] = useState<{
+    width: number;
+    height: number;
+  }>({ width: 640, height: 480 });
   const sampleImageRef = useRef<HTMLImageElement | null>(null);
 
   const frontSnapshotRef = useRef<FrontViewMeasurements | null>(null);
@@ -88,6 +95,14 @@ export default function App(): React.JSX.Element {
     localStorage.setItem("morpholens_is_imperial", next.toString());
   };
 
+  const handleImageLoad = useCallback((w: number, h: number) => {
+    setSampleDimensions({ width: w, height: h });
+  }, []);
+
+  const toggleCustomOrientation = useCallback(() => {
+    setCustomOrientation((prev) => (prev === "front" ? "side" : "front"));
+  }, []);
+
   const handleSelectSample = useCallback(
     (presetId: string | null, customUrl?: string) => {
       if (!presetId) {
@@ -99,6 +114,7 @@ export default function App(): React.JSX.Element {
       if (presetId === "custom" && customUrl) {
         setSamplePresetId("custom");
         setSampleImageUrl(customUrl);
+        setCustomOrientation("front");
         return;
       }
 
@@ -149,14 +165,12 @@ export default function App(): React.JSX.Element {
   // Execute snapshot capture for current angle
   const executeCapture = useCallback(
     (currentLandmarks: NormalizedLandmark[]) => {
-      const vWidth =
-        sampleImageUrl && sampleImageRef.current?.naturalWidth
-          ? sampleImageRef.current.naturalWidth
-          : webcam.videoWidth || 640;
-      const vHeight =
-        sampleImageUrl && sampleImageRef.current?.naturalHeight
-          ? sampleImageRef.current.naturalHeight
-          : webcam.videoHeight || 480;
+      const vWidth = sampleImageUrl
+        ? sampleDimensions.width
+        : webcam.videoWidth || 640;
+      const vHeight = sampleImageUrl
+        ? sampleDimensions.height
+        : webcam.videoHeight || 480;
 
       if (captureStage === "front_countdown") {
         feedback.playCaptureChime();
@@ -308,11 +322,12 @@ export default function App(): React.JSX.Element {
               );
               setLandmarks(smoothed);
 
-              const vWidth = img.naturalWidth || 640;
-              const vHeight = img.naturalHeight || 480;
+              const vWidth = img.naturalWidth || sampleDimensions.width;
+              const vHeight = img.naturalHeight || sampleDimensions.height;
 
               const isSide =
                 samplePresetId === "male-side" ||
+                (samplePresetId === "custom" && customOrientation === "side") ||
                 captureStage.startsWith("side");
               const q = evaluatePoseQuality(
                 smoothed,
@@ -420,6 +435,9 @@ export default function App(): React.JSX.Element {
     captureStage,
     sampleImageUrl,
     samplePresetId,
+    sampleDimensions.width,
+    sampleDimensions.height,
+    customOrientation,
   ]);
 
   useEffect(() => {
@@ -530,15 +548,14 @@ export default function App(): React.JSX.Element {
               isMock={webcam.isMock}
               facingMode={webcam.facingMode}
               videoWidth={
-                sampleImageUrl && sampleImageRef.current?.naturalWidth
-                  ? sampleImageRef.current.naturalWidth
-                  : webcam.videoWidth
+                sampleImageUrl ? sampleDimensions.width : webcam.videoWidth
               }
               videoHeight={
-                sampleImageUrl && sampleImageRef.current?.naturalHeight
-                  ? sampleImageRef.current.naturalHeight
-                  : webcam.videoHeight
+                sampleImageUrl ? sampleDimensions.height : webcam.videoHeight
               }
+              onImageLoad={handleImageLoad}
+              customOrientation={customOrientation}
+              onToggleCustomOrientation={toggleCustomOrientation}
               onToggleCamera={webcam.toggleFacingMode}
               onToggleMock={() => {
                 if (sampleImageUrl) {

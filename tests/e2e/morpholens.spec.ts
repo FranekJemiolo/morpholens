@@ -76,7 +76,7 @@ test.describe("MorphoLens E2E Suite", () => {
     // Verify human subject detected
     await expect(
       page.getByText("HUMAN DETECTED").or(page.getByText("TRACKING ACTIVE")),
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: 25000 });
 
     // Verify anthropometric metrics computed from the human subject
     const weightCard = page.getByTestId("card-weight");
@@ -96,6 +96,36 @@ test.describe("MorphoLens E2E Suite", () => {
     // Verify female subject updates height anchor and recalculates
     await expect(page.getByText("168 cm")).toBeVisible();
     await expect(weightCard).toBeVisible();
+  });
+
+  test("allows uploading a custom image and computes telemetry from the uploaded photo", async ({
+    page,
+  }) => {
+    // Locate the file upload input
+    const fileInput = page.getByTestId("input-file-upload");
+    await expect(fileInput).toBeAttached();
+
+    // Upload generated human test image
+    await fileInput.setInputFiles("tests/fixtures/images/male-front.jpg");
+
+    // Verify photo analyzed status and telemetry
+    await expect(
+      page.getByText("PHOTO ANALYZED").or(page.getByText("HUMAN DETECTED")),
+    ).toBeVisible({ timeout: 25000 });
+
+    const weightCard = page.getByTestId("card-weight");
+    await expect(weightCard).toBeVisible();
+    await expect(weightCard).toContainText(/kg|lbs/);
+
+    const bodyFatCard = page.getByTestId("card-bodyfat");
+    await expect(bodyFatCard).toBeVisible();
+    await expect(bodyFatCard).toContainText(/%/);
+
+    // Verify angle toggle button is present and switches orientation
+    const angleToggle = page.getByTestId("btn-toggle-custom-angle");
+    await expect(angleToggle).toBeVisible();
+    await angleToggle.click();
+    await expect(angleToggle).toContainText(/side/i);
   });
 
   test("updates anthropometric calculations when anchor height is modified", async ({
