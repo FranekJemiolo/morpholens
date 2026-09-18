@@ -73,6 +73,28 @@ describe("Anthropometrics Math & Regression Engine", () => {
       const partialScale = computeOpticalScale(partialPose, 175, 640, 480);
       expect(partialScale.scaleFactor).toBe(0);
     });
+
+    it("reconstructs optical scale allometrically when feet are truncated/out of frame", () => {
+      // Simulate feet cut off at knees
+      const poseWithoutFeet = standardFrontPose.map((lm, idx) => {
+        if (idx >= 27) {
+          // Ankles, heels, feet indices occluded
+          return { ...lm, visibility: 0.1, y: 0.99 };
+        }
+        return lm;
+      });
+
+      const fullScale = computeOpticalScale(standardFrontPose, 180, 640, 480);
+      const reconstructedScale = computeOpticalScale(poseWithoutFeet, 180, 640, 480);
+
+      // Reconstructed stature should be within 10% of full stature rather than collapsing
+      expect(reconstructedScale.scaleFactor).toBeGreaterThan(0.2);
+      const diffPercent =
+        Math.abs(
+          reconstructedScale.detectedHeightPx - fullScale.detectedHeightPx,
+        ) / fullScale.detectedHeightPx;
+      expect(diffPercent).toBeLessThan(0.1);
+    });
   });
 
   describe("Pose Validity Gate & Quality Evaluation", () => {

@@ -111,8 +111,12 @@ export function computeOpticalScale(
   const rAnkle = landmarks[28];
   const lHeel = landmarks[29];
   const rHeel = landmarks[30];
+  const lKnee = landmarks[25];
+  const rKnee = landmarks[26];
+  const lHip = landmarks[23];
+  const rHip = landmarks[24];
 
-  if (!nose || !lShoulder || !rShoulder || !lAnkle || !rAnkle) {
+  if (!nose || !lShoulder || !rShoulder) {
     return { scaleFactor: 0, detectedHeightPx: 0 };
   }
 
@@ -122,12 +126,45 @@ export function computeOpticalScale(
   const headHeightPx = Math.max(20, (shoulderMidY - noseY) * 1.6);
   const cranialApexY = Math.max(0, noseY - headHeightPx * 0.75);
 
-  // Floor baseline (average of heels or ankles)
-  const heelY1 = (lHeel?.y ?? lAnkle.y) * canvasHeight;
-  const heelY2 = (rHeel?.y ?? rAnkle.y) * canvasHeight;
-  const floorBaselineY = (heelY1 + heelY2) / 2;
+  // If head is cut off above top of frame (nose is close to top or cranialApex clamped)
+  const isHeadTruncated = nose.y < 0.05 || cranialApexY <= 0;
 
-  const detectedHeightPx = Math.max(1, floorBaselineY - cranialApexY);
+  // Check if feet are visible and not cut off by frame bottom
+  const lAnkleVis = lAnkle?.visibility ?? 0.8;
+  const rAnkleVis = rAnkle?.visibility ?? 0.8;
+  const ankleY1 = (lHeel?.y ?? lAnkle?.y ?? 1) * canvasHeight;
+  const ankleY2 = (rHeel?.y ?? rAnkle?.y ?? 1) * canvasHeight;
+  const rawFloorY = (ankleY1 + ankleY2) / 2;
+
+  const isFeetTruncated =
+    !lAnkle ||
+    !rAnkle ||
+    (lAnkleVis < 0.4 && rAnkleVis < 0.4) ||
+    Math.max(lAnkle?.y ?? 1, rAnkle?.y ?? 1) > 0.97;
+
+  let detectedHeightPx: number;
+
+  if (isFeetTruncated && lKnee && rKnee && (lKnee.visibility ?? 0.8) > 0.4) {
+    // Knees are visible: Winter's allometric ratio — Vertex to Knee is ~71.5% of stature
+    const kneeMidY = ((lKnee.y + rKnee.y) / 2) * canvasHeight;
+    const vertexToKneePx = Math.max(50, kneeMidY - cranialApexY);
+    detectedHeightPx = vertexToKneePx / 0.715;
+  } else if (isFeetTruncated && lHip && rHip && (lHip.visibility ?? 0.8) > 0.4) {
+    // Hips are visible: Vertex to Greater Trochanter is ~47% of stature
+    const hipMidY = ((lHip.y + rHip.y) / 2) * canvasHeight;
+    const vertexToHipPx = Math.max(30, hipMidY - cranialApexY);
+    detectedHeightPx = vertexToHipPx / 0.47;
+  } else {
+    // Standard full-body floor baseline
+    const floorBaselineY = rawFloorY;
+    if (isHeadTruncated && !isFeetTruncated) {
+      // Head cut off: Floor to Shoulder Mid is ~81.8% of stature
+      const shoulderToFloorPx = Math.max(50, floorBaselineY - shoulderMidY);
+      detectedHeightPx = shoulderToFloorPx / 0.818;
+    } else {
+      detectedHeightPx = Math.max(1, floorBaselineY - cranialApexY);
+    }
+  }
 
   // Scale factor in cm per pixel
   const scaleFactor = anchorHeightCm / detectedHeightPx;
