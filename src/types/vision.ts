@@ -87,3 +87,12 @@ export interface AnthropometricMetrics {
   frontSnapshot?: FrontViewMeasurements;
   sideSnapshot?: SideViewMeasurements;
 }
+
+export interface SampleHumanPreset {
+  id: string;
+  name: string;
+  gender: "male" | "female";
+  orientation: "front" | "side";
+  path: string;
+  suggestedHeightCm: number;
+}

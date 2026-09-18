@@ -1,6 +1,5 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
-  Camera,
   RefreshCw,
   AlertTriangle,
   PlayCircle,
@@ -9,6 +8,9 @@ import {
   Scan,
   Compass,
   CheckCircle2,
+  Users,
+  ChevronDown,
+  Upload,
 } from "lucide-react";
 import type {
   NormalizedLandmark,
@@ -18,9 +20,14 @@ import type {
 } from "../types/vision.ts";
 import { POSE_CONNECTIONS } from "../services/poseLandmarker.ts";
 import { projectToCanvas } from "../lib/anthropometrics.ts";
+import { SAMPLE_HUMANS } from "../services/samplePresets.ts";
 
 interface CameraViewProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  sampleImageRef: React.RefObject<HTMLImageElement | null>;
+  samplePresetId: string | null;
+  sampleImageUrl: string | null;
+  onSelectSample: (presetId: string | null, customUrl?: string) => void;
   landmarks: NormalizedLandmark[] | null;
   confidence: number;
   fps: number;
@@ -44,6 +51,10 @@ interface CameraViewProps {
 
 export const CameraView: React.FC<CameraViewProps> = ({
   videoRef,
+  sampleImageRef,
+  samplePresetId,
+  sampleImageUrl,
+  onSelectSample,
   landmarks,
   confidence: _confidence,
   fps,
@@ -64,6 +75,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
   onResetScan,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [showSampleMenu, setShowSampleMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Render skeleton HUD and dynamic viewport silhouette guide over video
   useEffect(() => {
@@ -192,8 +205,16 @@ export const CameraView: React.FC<CameraViewProps> = ({
       // 4. Draw Skeleton with Aspect-Ratio Projection Correction
       if (landmarks && landmarks.length >= 33) {
         // Project normalized landmarks to canvas coordinates taking object-fit:cover into account
+        const isMirrored = !sampleImageUrl && facingMode === "user";
         const projectedPoints = landmarks.map((lm) =>
-          projectToCanvas(lm, width, height, videoWidth, videoHeight, true),
+          projectToCanvas(
+            lm,
+            width,
+            height,
+            videoWidth,
+            videoHeight,
+            isMirrored,
+          ),
         );
 
         // Draw Skeletal Bone Connections
@@ -306,19 +327,39 @@ export const CameraView: React.FC<CameraViewProps> = ({
   }, [landmarks, isMock, metrics, videoWidth, videoHeight, quality]);
 
   const isGuidedMode = captureStage !== "idle" && captureStage !== "completed";
+  const activePreset = SAMPLE_HUMANS.find((s) => s.id === samplePresetId);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      onSelectSample("custom", url);
+      setShowSampleMenu(false);
+    }
+  };
 
   return (
     <div className="relative w-full aspect-[4/3] md:aspect-[16/10] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl flex flex-col">
-      {/* Live Video Mirror */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={`absolute inset-0 w-full h-full object-cover -scale-x-100 ${
-          isMock ? "opacity-0" : "opacity-100"
-        }`}
-      />
+      {/* Live Video Mirror or Sample Human Subject */}
+      {sampleImageUrl ? (
+        <img
+          ref={sampleImageRef}
+          src={sampleImageUrl}
+          alt="Human Test Subject"
+          crossOrigin="anonymous"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`absolute inset-0 w-full h-full object-cover ${
+            facingMode === "user" ? "-scale-x-100" : ""
+          } ${isMock ? "opacity-0" : "opacity-100"}`}
+        />
+      )}
 
       {/* Canvas HUD Overlay */}
       <canvas
@@ -344,7 +385,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
             />
             <span className="text-slate-300 font-medium">
               {landmarks
-                ? "TRACKING ACTIVE"
+                ? sampleImageUrl
+                  ? "HUMAN DETECTED"
+                  : "TRACKING ACTIVE"
                 : isMock
                   ? "SIMULATION"
                   : "STANDBY"}
@@ -399,6 +442,88 @@ export const CameraView: React.FC<CameraViewProps> = ({
             </button>
           )}
 
+          {/* Sample Human Test Subjects Selector */}
+          <div className="relative">
+            <button
+              data-testid="btn-sample-toggle"
+              onClick={() => setShowSampleMenu((prev) => !prev)}
+              title="Test with Generated Human Photos"
+              className={`px-2.5 py-1 rounded-md text-xs font-mono border transition flex items-center space-x-1.5 ${
+                samplePresetId
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
+                  : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">
+                {activePreset
+                  ? activePreset.name
+                  : samplePresetId === "custom"
+                    ? "Custom Image"
+                    : "SAMPLE HUMANS"}
+              </span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {showSampleMenu && (
+              <div className="absolute right-0 mt-1.5 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-30 py-1.5 text-xs font-mono">
+                <div className="px-3 py-1 text-[10px] text-cyan-400/80 font-semibold uppercase tracking-wider border-b border-slate-800">
+                  AI Human Test Subjects
+                </div>
+                {SAMPLE_HUMANS.map((sample) => (
+                  <button
+                    key={sample.id}
+                    data-testid={`btn-sample-${sample.id}`}
+                    onClick={() => {
+                      onSelectSample(sample.id);
+                      setShowSampleMenu(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 transition flex items-center justify-between ${
+                      samplePresetId === sample.id
+                        ? "text-cyan-300 font-bold bg-cyan-500/10"
+                        : "text-slate-300"
+                    }`}
+                  >
+                    <span>{sample.name}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {sample.suggestedHeightCm}cm
+                    </span>
+                  </button>
+                ))}
+
+                <label
+                  data-testid="btn-sample-upload"
+                  className="w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
+                >
+                  <span className="flex items-center space-x-1.5">
+                    <Upload className="w-3 h-3 text-cyan-400" />
+                    <span>Upload Custom Image</span>
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                </label>
+
+                {samplePresetId && (
+                  <button
+                    data-testid="btn-sample-clear"
+                    onClick={() => {
+                      onSelectSample(null);
+                      setShowSampleMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-red-500/15 text-red-400 hover:text-red-300 transition border-t border-slate-800 mt-1 pt-1.5"
+                  >
+                    Clear (Live Camera)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             data-testid="btn-simulate"
             onClick={onToggleMock}
@@ -413,7 +538,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
             <span>{isMock ? "LIVE WEBCAM" : "SIMULATE"}</span>
           </button>
 
-          {!isMock && (
+          {!isMock && !sampleImageUrl && (
             <button
               onClick={onToggleCamera}
               title={`Switch camera (current: ${facingMode})`}
@@ -525,26 +650,41 @@ export const CameraView: React.FC<CameraViewProps> = ({
               Retry
             </button>
             <button
-              data-testid="btn-simulate-error"
-              onClick={onToggleMock}
+              data-testid="btn-sample-fallback"
+              onClick={() => onSelectSample("male-front")}
               className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-mono transition flex items-center space-x-1"
             >
+              <Users className="w-3.5 h-3.5" />
+              <span>Sample Human</span>
+            </button>
+            <button
+              data-testid="btn-simulate-error"
+              onClick={onToggleMock}
+              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-mono transition flex items-center space-x-1 border border-slate-700"
+            >
               <Eye className="w-3.5 h-3.5" />
-              <span>Simulate Pose</span>
+              <span>Simulate</span>
             </button>
           </div>
         </div>
       )}
 
       {/* Standby Hint */}
-      {!isLoading && !error && !landmarks && !isMock && !isGuidedMode && (
-        <div className="absolute inset-x-0 bottom-4 z-20 flex justify-center pointer-events-none">
-          <div className="px-4 py-2 bg-slate-900/85 backdrop-blur-md rounded-full border border-cyan-500/20 text-xs font-mono text-slate-300 flex items-center space-x-2 shadow-neon">
-            <Camera className="w-4 h-4 text-cyan-400 animate-pulse" />
-            <span>Step into camera frame to initialize 33-point tracking</span>
+      {!isLoading &&
+        !error &&
+        !landmarks &&
+        !isMock &&
+        !isGuidedMode &&
+        !sampleImageUrl && (
+          <div className="absolute inset-x-0 bottom-4 z-20 flex justify-center pointer-events-none">
+            <div className="px-4 py-2 bg-slate-900/85 backdrop-blur-md rounded-full border border-cyan-500/20 text-xs font-mono text-slate-300 flex items-center space-x-2 shadow-neon">
+              <Users className="w-4 h-4 text-cyan-400 animate-pulse" />
+              <span>
+                Select a Sample Human subject above or step into camera frame
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 };

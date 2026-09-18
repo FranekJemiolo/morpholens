@@ -60,6 +60,44 @@ test.describe("MorphoLens E2E Suite", () => {
     await expect(page.getByText("HIP SPAN").first()).toBeVisible();
   });
 
+  test("detects pose and computes telemetry using generated human test subjects", async ({
+    page,
+  }) => {
+    // Open sample menu
+    const sampleToggle = page.getByTestId("btn-sample-toggle");
+    await expect(sampleToggle).toBeVisible();
+    await sampleToggle.click();
+
+    // Select generated male front test subject
+    const maleButton = page.getByTestId("btn-sample-male-front");
+    await expect(maleButton).toBeVisible();
+    await maleButton.click();
+
+    // Verify human subject detected
+    await expect(
+      page.getByText("HUMAN DETECTED").or(page.getByText("TRACKING ACTIVE")),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Verify anthropometric metrics computed from the human subject
+    const weightCard = page.getByTestId("card-weight");
+    await expect(weightCard).toBeVisible();
+    await expect(weightCard).toContainText(/kg|lbs/);
+
+    const bodyFatCard = page.getByTestId("card-bodyfat");
+    await expect(bodyFatCard).toBeVisible();
+    await expect(bodyFatCard).toContainText(/%/);
+
+    // Switch to female generated human subject
+    await sampleToggle.click();
+    const femaleButton = page.getByTestId("btn-sample-female-front");
+    await expect(femaleButton).toBeVisible();
+    await femaleButton.click();
+
+    // Verify female subject updates height anchor and recalculates
+    await expect(page.getByText("168 cm")).toBeVisible();
+    await expect(weightCard).toBeVisible();
+  });
+
   test("updates anthropometric calculations when anchor height is modified", async ({
     page,
   }) => {

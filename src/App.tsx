@@ -32,6 +32,7 @@ import type {
 import { CameraView } from "./components/CameraView.tsx";
 import { BodyMesh } from "./components/BodyMesh.tsx";
 import { MetricsDisplay } from "./components/MetricsDisplay.tsx";
+import { SAMPLE_HUMANS } from "./services/samplePresets.ts";
 
 export default function App(): React.JSX.Element {
   const webcam = useWebcam();
@@ -58,6 +59,11 @@ export default function App(): React.JSX.Element {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [quality, setQuality] = useState<PoseQualityAssessment | null>(null);
 
+  // Sample Human Presets
+  const [samplePresetId, setSamplePresetId] = useState<string | null>(null);
+  const [sampleImageUrl, setSampleImageUrl] = useState<string | null>(null);
+  const sampleImageRef = useRef<HTMLImageElement | null>(null);
+
   const frontSnapshotRef = useRef<FrontViewMeasurements | null>(null);
   const sideSnapshotRef = useRef<SideViewMeasurements | null>(null);
 
@@ -81,6 +87,32 @@ export default function App(): React.JSX.Element {
     setIsImperial(next);
     localStorage.setItem("morpholens_is_imperial", next.toString());
   };
+
+  const handleSelectSample = useCallback(
+    (presetId: string | null, customUrl?: string) => {
+      if (!presetId) {
+        setSamplePresetId(null);
+        setSampleImageUrl(null);
+        return;
+      }
+
+      if (presetId === "custom" && customUrl) {
+        setSamplePresetId("custom");
+        setSampleImageUrl(customUrl);
+        return;
+      }
+
+      const preset = SAMPLE_HUMANS.find((s) => s.id === presetId);
+      if (preset) {
+        const baseUrl = import.meta.env.BASE_URL || "./";
+        const fullUrl = `${baseUrl.replace(/\/$/, "")}/${preset.path}`;
+        setSamplePresetId(preset.id);
+        setSampleImageUrl(fullUrl);
+        setAnchorHeightCm(preset.suggestedHeightCm);
+      }
+    },
+    [],
+  );
 
   // Initialize MediaPipe PoseLandmarker model
   useEffect(() => {
@@ -117,8 +149,14 @@ export default function App(): React.JSX.Element {
   // Execute snapshot capture for current angle
   const executeCapture = useCallback(
     (currentLandmarks: NormalizedLandmark[]) => {
-      const vWidth = webcam.videoWidth || 640;
-      const vHeight = webcam.videoHeight || 480;
+      const vWidth =
+        sampleImageUrl && sampleImageRef.current?.naturalWidth
+          ? sampleImageRef.current.naturalWidth
+          : webcam.videoWidth || 640;
+      const vHeight =
+        sampleImageUrl && sampleImageRef.current?.naturalHeight
+          ? sampleImageRef.current.naturalHeight
+          : webcam.videoHeight || 480;
 
       if (captureStage === "front_countdown") {
         feedback.playCaptureChime();
@@ -249,7 +287,57 @@ export default function App(): React.JSX.Element {
       fpsTimerRef.current = now;
     }
 
-    // 1. Simulation / Mock Mode
+    // 1. Sample Human Subject Image Inference
+    if (sampleImageUrl && sampleImageRef.current) {
+      const img = sampleImageRef.current;
+      if (
+        img.complete &&
+        img.naturalWidth > 0 &&
+        landmarkerServiceRef.current.isReady()
+      ) {
+        if (now - lastTimeRef.current >= 30) {
+          lastTimeRef.current = now;
+          const result = landmarkerServiceRef.current.detectForVideo(img, now);
+
+          if (result && result.landmarks && result.landmarks.length > 0) {
+            const rawLandmarks = result.landmarks[0];
+            if (rawLandmarks && rawLandmarks.length >= 33) {
+              const smoothed = temporalFilterRef.current.filter(
+                rawLandmarks,
+                now,
+              );
+              setLandmarks(smoothed);
+
+              const vWidth = img.naturalWidth || 640;
+              const vHeight = img.naturalHeight || 480;
+
+              const isSide =
+                samplePresetId === "male-side" ||
+                captureStage.startsWith("side");
+              const q = evaluatePoseQuality(
+                smoothed,
+                isSide ? "side" : "front",
+              );
+              setQuality(q);
+              setConfidence(Math.max(0.9, q.qualityScore / 100));
+
+              if (captureStage === "idle" || captureStage === "completed") {
+                const computed = computeAnthropometrics(
+                  smoothed,
+                  anchorHeightCm,
+                  vWidth,
+                  vHeight,
+                );
+                setMetrics(computed);
+              }
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    // 2. Simulation / Mock Mode
     if (webcam.isMock) {
       const isSide = captureStage.startsWith("side");
       const synthetic = generateSyntheticPose(now / 1000, 1.0);
@@ -330,6 +418,8 @@ export default function App(): React.JSX.Element {
     webcam.videoHeight,
     anchorHeightCm,
     captureStage,
+    sampleImageUrl,
+    samplePresetId,
   ]);
 
   useEffect(() => {
@@ -428,6 +518,10 @@ export default function App(): React.JSX.Element {
           >
             <CameraView
               videoRef={webcam.videoRef}
+              sampleImageRef={sampleImageRef}
+              samplePresetId={samplePresetId}
+              sampleImageUrl={sampleImageUrl}
+              onSelectSample={handleSelectSample}
               landmarks={landmarks}
               confidence={confidence}
               fps={fps}
@@ -435,10 +529,23 @@ export default function App(): React.JSX.Element {
               isLoading={webcam.isLoading || isModelLoading}
               isMock={webcam.isMock}
               facingMode={webcam.facingMode}
-              videoWidth={webcam.videoWidth}
-              videoHeight={webcam.videoHeight}
+              videoWidth={
+                sampleImageUrl && sampleImageRef.current?.naturalWidth
+                  ? sampleImageRef.current.naturalWidth
+                  : webcam.videoWidth
+              }
+              videoHeight={
+                sampleImageUrl && sampleImageRef.current?.naturalHeight
+                  ? sampleImageRef.current.naturalHeight
+                  : webcam.videoHeight
+              }
               onToggleCamera={webcam.toggleFacingMode}
-              onToggleMock={webcam.toggleMockMode}
+              onToggleMock={() => {
+                if (sampleImageUrl) {
+                  handleSelectSample(null);
+                }
+                webcam.toggleMockMode();
+              }}
               onRetry={webcam.retryCamera}
               anchorHeightCm={anchorHeightCm}
               metrics={metrics}

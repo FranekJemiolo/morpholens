@@ -102,21 +102,34 @@ export class PoseLandmarkerService {
   }
 
   public detectForVideo(
-    videoElement: HTMLVideoElement,
+    source: HTMLVideoElement | HTMLCanvasElement | HTMLImageElement,
     timestampMs: number,
   ): PoseLandmarkerResult | null {
     if (!this.landmarker) return null;
     try {
-      if (
-        videoElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-        videoElement.videoWidth > 0 &&
-        videoElement.videoHeight > 0
-      ) {
-        return this.landmarker.detectForVideo(videoElement, timestampMs);
+      if (source instanceof HTMLVideoElement) {
+        if (
+          source.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+          source.videoWidth > 0 &&
+          source.videoHeight > 0
+        ) {
+          return this.landmarker.detectForVideo(source, timestampMs);
+        }
+        return null;
+      } else if (source instanceof HTMLImageElement) {
+        if (source.complete && source.naturalWidth > 0) {
+          return this.landmarker.detectForVideo(source, timestampMs);
+        }
+        return null;
+      } else if (source instanceof HTMLCanvasElement) {
+        if (source.width > 0 && source.height > 0) {
+          return this.landmarker.detectForVideo(source, timestampMs);
+        }
+        return null;
       }
       return null;
     } catch (err) {
-      console.warn("Pose detection error on frame:", err);
+      console.warn("Pose detection error on source:", err);
       return null;
     }
   }
