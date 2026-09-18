@@ -6,6 +6,7 @@ import {
   Maximize2,
   Video,
   Box,
+  PlayCircle,
 } from "lucide-react";
 import { useWebcam } from "./hooks/useWebcam.ts";
 import {
@@ -18,6 +19,7 @@ import {
   extractFrontMeasurements,
   extractSideMeasurements,
   fuseMultiAngleAnthropometrics,
+  detectBiologicalSex,
 } from "./lib/anthropometrics.ts";
 import { PoseTemporalFilter } from "./lib/filters/oneEuroFilter.ts";
 import { feedback } from "./lib/feedback/audioHaptics.ts";
@@ -95,6 +97,24 @@ export default function App(): React.JSX.Element {
     localStorage.setItem("morpholens_is_imperial", next.toString());
   };
 
+  // Biological Sex state with localStorage persistence and manual override flag
+  const [biologicalSex, setBiologicalSex] = useState<"male" | "female">(() => {
+    const saved = localStorage.getItem("morpholens_biological_sex");
+    return saved === "female" ? "female" : "male";
+  });
+  const [isSexManuallySet, setIsSexManuallySet] = useState<boolean>(() => {
+    return !!localStorage.getItem("morpholens_biological_sex");
+  });
+
+  const handleToggleSex = useCallback((newSex?: "male" | "female") => {
+    setBiologicalSex((prev) => {
+      const next = newSex || (prev === "male" ? "female" : "male");
+      localStorage.setItem("morpholens_biological_sex", next);
+      setIsSexManuallySet(true);
+      return next;
+    });
+  }, []);
+
   const handleImageLoad = useCallback((w: number, h: number) => {
     setSampleDimensions({ width: w, height: h });
   }, []);
@@ -148,9 +168,12 @@ export default function App(): React.JSX.Element {
         setSampleImageUrl(fullUrl);
         setCustomOrientation(preset.orientation);
         setAnchorHeightCm(preset.suggestedHeightCm);
+        if (!isSexManuallySet) {
+          setBiologicalSex(preset.gender);
+        }
       }
     },
-    [webcam],
+    [webcam, isSexManuallySet],
   );
 
   // Initialize MediaPipe PoseLandmarker model
@@ -226,13 +249,20 @@ export default function App(): React.JSX.Element {
             frontSnapshotRef.current,
             side,
             anchorHeightCm,
+            biologicalSex,
           );
           setMetrics(fused);
         }
         setCaptureStage("completed");
       }
     },
-    [captureStage, webcam.videoWidth, webcam.videoHeight, anchorHeightCm],
+    [
+      captureStage,
+      webcam.videoWidth,
+      webcam.videoHeight,
+      anchorHeightCm,
+      biologicalSex,
+    ],
   );
 
   // Trigger countdown when alignment is locked
@@ -339,6 +369,12 @@ export default function App(): React.JSX.Element {
           if (result && result.landmarks && result.landmarks.length > 0) {
             const rawLandmarks = result.landmarks[0];
             if (rawLandmarks && rawLandmarks.length >= 33) {
+              if (!isSexManuallySet) {
+                const autoSex = detectBiologicalSex(rawLandmarks);
+                if (autoSex !== biologicalSex) {
+                  setBiologicalSex(autoSex);
+                }
+              }
               const smoothed = temporalFilterRef.current.filter(
                 rawLandmarks,
                 now,
@@ -365,6 +401,7 @@ export default function App(): React.JSX.Element {
                   anchorHeightCm,
                   vWidth,
                   vHeight,
+                  biologicalSex,
                 );
                 setMetrics(computed);
               }
@@ -393,6 +430,7 @@ export default function App(): React.JSX.Element {
           anchorHeightCm,
           webcam.videoWidth,
           webcam.videoHeight,
+          biologicalSex,
         );
         setMetrics(computed);
       }
@@ -413,6 +451,12 @@ export default function App(): React.JSX.Element {
         if (result && result.landmarks && result.landmarks.length > 0) {
           const rawLandmarks = result.landmarks[0];
           if (rawLandmarks && rawLandmarks.length >= 33) {
+            if (!isSexManuallySet) {
+              const autoSex = detectBiologicalSex(rawLandmarks);
+              if (autoSex !== biologicalSex) {
+                setBiologicalSex(autoSex);
+              }
+            }
             // Apply 1€ temporal smoothing filter
             const smoothed = temporalFilterRef.current.filter(
               rawLandmarks,
@@ -435,6 +479,7 @@ export default function App(): React.JSX.Element {
                 anchorHeightCm,
                 vWidth,
                 vHeight,
+                biologicalSex,
               );
               setMetrics(computed);
             }
@@ -501,6 +546,30 @@ export default function App(): React.JSX.Element {
           </div>
 
           <div className="flex items-center space-x-3">
+            {/* Developer / Demo Simulator Mode button */}
+            <button
+              data-testid="btn-simulate"
+              onClick={() => {
+                if (sampleImageUrl) {
+                  handleSelectSample(null);
+                }
+                webcam.toggleMockMode();
+              }}
+              title={
+                webcam.isMock
+                  ? "Stop Simulation (Return to Normal Mode)"
+                  : "Run Synthetic Biometric Simulation (Demo / Test)"
+              }
+              className={`px-2.5 py-1 rounded-lg text-xs font-mono border transition flex items-center space-x-1.5 ${
+                webcam.isMock
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-neon"
+                  : "bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-slate-700 hover:border-cyan-500/40"
+              }`}
+            >
+              <PlayCircle className="w-3.5 h-3.5 text-amber-400" />
+              <span>{webcam.isMock ? "SIMULATING" : "SIMULATE"}</span>
+            </button>
+
             <div className="hidden md:flex items-center space-x-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-800 text-xs font-mono text-slate-300">
               <Cpu className="w-3.5 h-3.5 text-emerald-400" />
               <span>WASM SIMD</span>
@@ -597,6 +666,8 @@ export default function App(): React.JSX.Element {
               quality={quality}
               onStartGuidedScan={startGuidedScan}
               onResetScan={resetScan}
+              biologicalSex={biologicalSex}
+              onToggleSex={handleToggleSex}
             />
           </div>
 
@@ -618,6 +689,8 @@ export default function App(): React.JSX.Element {
             onUpdateAnchorHeight={handleUpdateAnchorHeight}
             isImperial={isImperial}
             onToggleUnits={handleToggleUnits}
+            biologicalSex={biologicalSex}
+            onToggleSex={handleToggleSex}
           />
         </div>
       </main>

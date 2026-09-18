@@ -459,6 +459,30 @@ export function extractSideMeasurements(
 }
 
 /**
+ * Automatically detects biological sex morphology from skeletal proportions.
+ * Uses biacromial (shoulder) to bi-iliac (pelvic) ratio (R_sh).
+ * Adult males characteristically exhibit R_sh >= 1.30 (V-taper).
+ * Adult females characteristically exhibit R_sh < 1.30 (gynoid/hourglass pelvic width).
+ */
+export function detectBiologicalSex(
+  landmarks: NormalizedLandmark[] | null,
+): "male" | "female" {
+  if (!landmarks || landmarks.length < 33) return "male";
+  const s11 = landmarks[11];
+  const s12 = landmarks[12];
+  const h23 = landmarks[23];
+  const h24 = landmarks[24];
+  if (!s11 || !s12 || !h23 || !h24) return "male";
+
+  const shoulderDx = Math.abs(s11.x - s12.x);
+  const hipDx = Math.abs(h23.x - h24.x);
+  if (hipDx <= 0.001) return "male";
+
+  const ratio = shoulderDx / hipDx;
+  return ratio < 1.3 ? "female" : "male";
+}
+
+/**
  * Fuses Coronal (Front) and Sagittal (Side) dimensions using dual-view
  * elliptical cross-section volumetric integration and Siri/Brozek body density models.
  */
@@ -466,90 +490,147 @@ export function fuseMultiAngleAnthropometrics(
   front: FrontViewMeasurements,
   side: SideViewMeasurements,
   anchorHeightCm: number,
+  biologicalSex: "male" | "female" = "male",
 ): AnthropometricMetrics {
-  const aShoulders = front.shoulderWidthCm;
-  const aHips = front.hipWidthCm;
-  const aWaist = front.waistWidthCm;
-  const bChest = side.chestDepthCm;
-  const bWaist = side.abdominalDepthCm;
-  const torsoLength = front.torsoLengthCm;
+  const isFemale = biologicalSex === "female";
 
-  // 1. Ramanujan true elliptical waist circumference from coronal & sagittal diameters:
-  // a = aWaist / 2, b = bWaist / 2
-  const aW = aWaist / 2;
-  const bW = bWaist / 2;
+  // Anatomical soft-tissue expansion factors from internal skeletal joint distances:
+  const outerShoulderWidthCm = front.shoulderWidthCm * (isFemale ? 1.12 : 1.16);
+  const outerHipWidthCm = front.hipWidthCm * (isFemale ? 1.25 : 1.18);
+  const outerWaistWidthCm = front.waistWidthCm * (isFemale ? 1.12 : 1.16);
+
+  // Sagittal depths (chest & abdominal):
+  const outerChestDepthCm = side.chestDepthCm * (isFemale ? 1.04 : 1.08);
+  const outerAbdominalDepthCm = side.abdominalDepthCm * (isFemale ? 1.04 : 1.08);
+  const outerHipDepthCm = side.abdominalDepthCm * (isFemale ? 1.14 : 1.08);
+
+  // 1. Ramanujan true elliptical circumferences:
+  // Waist circumference:
+  const aW = outerWaistWidthCm / 2;
+  const bW = outerAbdominalDepthCm / 2;
   const waistCircumferenceCm =
     Math.PI * (3 * (aW + bW) - Math.sqrt((3 * aW + bW) * (aW + 3 * bW)));
 
-  // Neck circumference estimate
-  const neckDiameterCm = aShoulders * 0.32;
+  // Hip circumference:
+  const aH = outerHipWidthCm / 2;
+  const bH = outerHipDepthCm / 2;
+  const hipCircumferenceCm =
+    Math.PI * (3 * (aH + bH) - Math.sqrt((3 * aH + bH) * (aH + 3 * bH)));
+
+  // Neck circumference estimate:
+  const neckDiameterCm = outerShoulderWidthCm * (isFemale ? 0.25 : 0.28);
   const neckCircumferenceCm = Math.PI * neckDiameterCm;
 
-  // 2. Dual-Axis Elliptical Cross-Section Volumes:
-  // Chest cross-section area: A = π * (aShoulders*0.8/2) * (bChest/2)
-  const aChest = aShoulders * 0.82;
-  const areaChest = Math.PI * (aChest / 2) * (bChest / 2);
+  // 2. Multi-Segment Volumetric Integration:
+  // A. Torso / Trunk:
+  // Effective trunk length from clavicular notch down to perineal floor:
+  const trunkLengthCm = front.torsoLengthCm * 1.18;
+  const aChest = outerShoulderWidthCm * (isFemale ? 0.82 : 0.88);
+  const areaChest = Math.PI * (aChest / 2) * (outerChestDepthCm / 2);
   const areaWaist = Math.PI * aW * bW;
-  const areaHips = Math.PI * (aHips / 2) * ((bWaist * 0.95) / 2);
+  const areaHips = Math.PI * aH * bH;
 
-  // Prismoidal / Simpson's rule for torso volume: V = (L / 6) * (A1 + 4*Am + A2)
+  // Simpson's prismoidal rule for torso volume:
   const torsoVolL =
-    ((torsoLength / 6) * (areaChest + 4 * areaWaist + areaHips)) / 1000;
+    ((trunkLengthCm / 6) * (areaChest + 4 * areaWaist + areaHips)) / 1000;
 
-  // Limbs volume:
-  const armRadiusCm = aShoulders * 0.13;
-  const armsVolL =
-    (2 * Math.PI * Math.pow(armRadiusCm, 2) * front.armLengthCm) / 1000;
+  // B. Arms (Dual Conical Frustums from shoulder to wrist):
+  const rArmProx = outerShoulderWidthCm * 0.125;
+  const rArmDist = outerShoulderWidthCm * 0.075;
+  const armVolL =
+    (Math.PI *
+      front.armLengthCm *
+      (Math.pow(rArmProx, 2) + rArmProx * rArmDist + Math.pow(rArmDist, 2))) /
+    3 /
+    1000;
+  const armsVolL = 2 * armVolL;
 
-  const legRadiusCm = aHips * 0.24;
-  const legsVolL =
-    (2 * Math.PI * Math.pow(legRadiusCm, 2) * front.legLengthCm) / 1000;
+  // C. Legs (Dual Conical Frustums for thigh & shank):
+  const rThigh = outerHipWidthCm * (isFemale ? 0.26 : 0.24);
+  const rKnee = outerHipWidthCm * 0.165;
+  const rAnkle = outerHipWidthCm * 0.105;
+  const thighLength = front.legLengthCm * 0.52;
+  const shankLength = front.legLengthCm * 0.48;
+  const thighVolL =
+    (Math.PI *
+      thighLength *
+      (Math.pow(rThigh, 2) + rThigh * rKnee + Math.pow(rKnee, 2))) /
+    3 /
+    1000;
+  const shankVolL =
+    (Math.PI *
+      shankLength *
+      (Math.pow(rKnee, 2) + rKnee * rAnkle + Math.pow(rAnkle, 2))) /
+    3 /
+    1000;
+  const legsVolL = 2 * (thighVolL + shankVolL);
 
-  // Head volume (~4.18 L)
-  const headVolL = ((4 / 3) * Math.PI * Math.pow(10, 3)) / 1000;
+  // D. Cranial & Cervical volume:
+  const headVolL = isFemale ? 4.4 : 5.0;
 
   const totalVolumeL = headVolL + torsoVolL + armsVolL + legsVolL;
-  const tissueDensity = 1.055;
+
+  // Mean tissue density (kg/L): slightly higher in males due to bone mineral and muscle density
+  const tissueDensity = isFemale ? 1.045 : 1.055;
   let estimatedWeightKg = totalVolumeL * tissueDensity;
 
-  // Normative physiological bounding (BMI 17..38)
+  // Normative physiological bounding: allows BMI 16.5 up to 42.0 (broad athlete/robust frame)
   const heightM = anchorHeightCm / 100;
-  const minPlausibleWeight = 17 * heightM * heightM;
-  const maxPlausibleWeight = 38 * heightM * heightM;
+  const minPlausibleWeight = 16.5 * heightM * heightM;
+  const maxPlausibleWeight = 42.0 * heightM * heightM;
   estimatedWeightKg = Math.min(
     maxPlausibleWeight,
     Math.max(minPlausibleWeight, estimatedWeightKg),
   );
 
-  // 3. Regressions:
-  // Modified US Navy Formula:
-  const waistNeckDelta = Math.max(
-    5,
-    waistCircumferenceCm - neckCircumferenceCm,
-  );
-  const logWaistNeck = Math.log10(waistNeckDelta);
+  const bmi = estimatedWeightKg / (heightM * heightM);
+
+  // 3. Regressions for Body Fat Percentage:
   const logHeight = Math.log10(anchorHeightCm);
-  let bodyFatNavy =
-    495 / (1.0324 - 0.19077 * logWaistNeck + 0.15456 * logHeight) - 450;
-  if (isNaN(bodyFatNavy) || bodyFatNavy < 5) bodyFatNavy = 8.5;
-  if (bodyFatNavy > 50) bodyFatNavy = 48.0;
+  let bodyFatNavy = 15.0;
+
+  if (isFemale) {
+    // US Navy Formula for Females:
+    const deltaFemale = Math.max(
+      5,
+      waistCircumferenceCm + hipCircumferenceCm - neckCircumferenceCm,
+    );
+    const logDeltaFemale = Math.log10(deltaFemale);
+    bodyFatNavy =
+      495 / (1.29579 - 0.35004 * logDeltaFemale + 0.221 * logHeight) - 450;
+    if (isNaN(bodyFatNavy) || bodyFatNavy < 10) bodyFatNavy = 18.0;
+    if (bodyFatNavy > 55) bodyFatNavy = 50.0;
+  } else {
+    // US Navy Formula for Males:
+    const deltaMale = Math.max(5, waistCircumferenceCm - neckCircumferenceCm);
+    const logDeltaMale = Math.log10(deltaMale);
+    bodyFatNavy =
+      495 / (1.0324 - 0.19077 * logDeltaMale + 0.15456 * logHeight) - 450;
+    if (isNaN(bodyFatNavy) || bodyFatNavy < 4) bodyFatNavy = 8.5;
+    if (bodyFatNavy > 50) bodyFatNavy = 48.0;
+  }
 
   // Anthropometric Body Density D:
-  // Derived from circumferences & height (Jackson-Pollock / Wilmore-Behnke generalized formulation)
-  const bodyDensity =
-    1.10938 -
-    0.0008267 * (waistCircumferenceCm * 0.45) +
-    0.0000016 * Math.pow(waistCircumferenceCm * 0.45, 2) -
-    0.0002574 * anchorHeightCm * 0.1;
+  const bodyDensity = isFemale
+    ? 1.0994921 -
+      0.0009929 * (waistCircumferenceCm * 0.45) +
+      0.0000023 * Math.pow(waistCircumferenceCm * 0.45, 2) -
+      0.0001392 * anchorHeightCm * 0.1
+    : 1.10938 -
+      0.0008267 * (waistCircumferenceCm * 0.45) +
+      0.0000016 * Math.pow(waistCircumferenceCm * 0.45, 2) -
+      0.0002574 * anchorHeightCm * 0.1;
 
   // Siri Equation: BF% = 495 / D - 450
   let bodyFatSiri = 495 / Math.max(1.01, bodyDensity) - 450;
-  if (isNaN(bodyFatSiri) || bodyFatSiri < 4) bodyFatSiri = 7.0;
+  if (isNaN(bodyFatSiri) || bodyFatSiri < (isFemale ? 8 : 4))
+    bodyFatSiri = isFemale ? 18.0 : 8.0;
   if (bodyFatSiri > 55) bodyFatSiri = 50.0;
 
   // Brožek Equation: BF% = 457 / D - 414.2
   let bodyFatBrozek = 457 / Math.max(1.01, bodyDensity) - 414.2;
-  if (isNaN(bodyFatBrozek) || bodyFatBrozek < 4) bodyFatBrozek = 7.0;
+  if (isNaN(bodyFatBrozek) || bodyFatBrozek < (isFemale ? 8 : 4))
+    bodyFatBrozek = isFemale ? 17.5 : 8.0;
   if (bodyFatBrozek > 55) bodyFatBrozek = 50.0;
 
   // Weighted composite body fat percentage
@@ -558,7 +639,7 @@ export function fuseMultiAngleAnthropometrics(
 
   // Lean Mass & Skeletal Muscle Mass
   const leanBodyMassKg = estimatedWeightKg * (1 - bodyFatPercentage / 100);
-  const skeletalMuscleMassKg = leanBodyMassKg * 0.54;
+  const skeletalMuscleMassKg = leanBodyMassKg * (isFemale ? 0.48 : 0.54);
 
   return {
     detectedHeightCm: front.detectedHeightCm,
@@ -579,6 +660,8 @@ export function fuseMultiAngleAnthropometrics(
     bodyFatBrozek: Number(bodyFatBrozek.toFixed(1)),
     leanBodyMassKg: Number(leanBodyMassKg.toFixed(1)),
     skeletalMuscleMassKg: Number(skeletalMuscleMassKg.toFixed(1)),
+    biologicalSex,
+    bmi: Number(bmi.toFixed(1)),
     confidence: 0.95,
     poseDetected: true,
     isDualAngle: true,
@@ -595,6 +678,7 @@ export function computeAnthropometrics(
   anchorHeightCm: number,
   canvasWidth = 640,
   canvasHeight = 480,
+  biologicalSex: "male" | "female" = "male",
 ): AnthropometricMetrics {
   const fallbackMetrics: AnthropometricMetrics = {
     detectedHeightCm: anchorHeightCm,
@@ -618,6 +702,7 @@ export function computeAnthropometrics(
     confidence: 0,
     poseDetected: false,
     isDualAngle: false,
+    biologicalSex,
   };
 
   if (!landmarks || landmarks.length < 33) {
@@ -642,10 +727,16 @@ export function computeAnthropometrics(
     canvasHeight,
   );
 
-  // Approximate sagittal depth using statistical human proportion ratio (0.58 shoulders, 0.72 waist)
+  const isFemale = biologicalSex === "female";
+
+  // Approximate sagittal depth using statistical human proportion ratios
   const syntheticSide: SideViewMeasurements = {
-    chestDepthCm: Number((front.shoulderWidthCm * 0.58).toFixed(1)),
-    abdominalDepthCm: Number((front.waistWidthCm * 0.72).toFixed(1)),
+    chestDepthCm: Number(
+      (front.shoulderWidthCm * (isFemale ? 0.6 : 0.66)).toFixed(1),
+    ),
+    abdominalDepthCm: Number(
+      (front.waistWidthCm * (isFemale ? 0.76 : 0.8)).toFixed(1),
+    ),
     cervicalPostureAngleDeg: 12.0,
     pelvicTiltAngleDeg: 8.0,
     timestamp: Date.now(),
@@ -655,6 +746,7 @@ export function computeAnthropometrics(
     front,
     syntheticSide,
     anchorHeightCm,
+    biologicalSex,
   );
   return {
     ...fused,

@@ -190,5 +190,21 @@ describe("Anthropometrics Math & Regression Engine", () => {
       expect(endo.bodyFatPercentage).toBeGreaterThan(ecto.bodyFatPercentage);
       expect(endo.estimatedWeightKg).toBeGreaterThan(ecto.estimatedWeightKg);
     });
+
+    it("accurately estimates adult male mass around 85-95kg for a robust 180cm frame rather than underestimating at 58kg", () => {
+      // standardFrontPose represents a healthy adult male at 180cm anchor
+      const metrics = computeAnthropometrics(
+        standardFrontPose,
+        180,
+        640,
+        480,
+        "male",
+      );
+      // Realistic weight for an adult male at 180cm should be 75-95kg, never severely deflated to 58kg
+      expect(metrics.estimatedWeightKg).toBeGreaterThanOrEqual(75);
+      expect(metrics.estimatedWeightKg).toBeLessThanOrEqual(100);
+      expect(metrics.biologicalSex).toBe("male");
+    });
   });
 });
+

@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState } from "react";
 import {
   RefreshCw,
   AlertTriangle,
-  PlayCircle,
   Activity,
   Scan,
   Compass,
@@ -53,6 +52,8 @@ interface CameraViewProps {
   quality: PoseQualityAssessment | null;
   onStartGuidedScan: () => void;
   onResetScan: () => void;
+  biologicalSex?: "male" | "female";
+  onToggleSex?: () => void;
 }
 
 export const CameraView: React.FC<CameraViewProps> = ({
@@ -77,7 +78,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
   onStartLiveCamera,
   onStopLiveCamera,
   onToggleCamera,
-  onToggleMock,
+  onToggleMock: _onToggleMock,
   onRetry,
   metrics,
   captureStage,
@@ -85,6 +86,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
   quality,
   onStartGuidedScan,
   onResetScan,
+  biologicalSex = "male",
+  onToggleSex,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [showSampleMenu, setShowSampleMenu] = useState(false);
@@ -558,133 +561,122 @@ export const CameraView: React.FC<CameraViewProps> = ({
             </button>
           )}
 
-          {/* Dedicated Direct Upload Photo Icon Button (Compact) */}
-          <button
-            data-testid="btn-upload-photo"
-            onClick={() => fileInputRef.current?.click()}
-            title="Upload your own full-body image"
-            className={`p-1 rounded border transition flex items-center justify-center ${
-              samplePresetId === "custom"
-                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-neon"
-                : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50 hover:text-cyan-300"
-            }`}
-          >
-            <Upload className="w-3 h-3 text-cyan-400" />
-          </button>
-          <input
-            ref={fileInputRef}
-            data-testid="input-file-upload"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
+            {/* Hidden File Input for Custom Uploads */}
+            <input
+              ref={fileInputRef}
+              data-testid="input-file-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
 
-          {/* Orientation Toggle for Custom Uploaded Photo */}
-          {samplePresetId === "custom" && onToggleCustomOrientation && (
-            <button
-              data-testid="btn-toggle-custom-angle"
-              onClick={onToggleCustomOrientation}
-              title="Toggle Front standing view vs Side profile view"
-              className="px-1.5 py-0.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 rounded text-[10px] font-mono transition flex items-center space-x-1"
-            >
-              <span className="text-[9px] text-slate-400">ANGLE:</span>
-              <span className="font-bold uppercase">
-                {customOrientation || "front"}
-              </span>
-            </button>
-          )}
+            {/* Orientation Toggle for Custom Uploaded Photo */}
+            {samplePresetId === "custom" && onToggleCustomOrientation && (
+              <button
+                data-testid="btn-toggle-custom-angle"
+                onClick={onToggleCustomOrientation}
+                title="Toggle Front standing view vs Side profile view"
+                className="px-1.5 py-0.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 rounded text-[10px] font-mono transition flex items-center space-x-1"
+              >
+                <span className="text-[9px] text-slate-400">ANGLE:</span>
+                <span className="font-bold uppercase">
+                  {customOrientation || "front"}
+                </span>
+              </button>
+            )}
 
-          {/* Sample Human Test Subjects Selector Dropdown Menu */}
-          <div className="relative">
-            <button
-              data-testid="btn-sample-toggle"
-              onClick={() => setShowSampleMenu((prev) => !prev)}
-              title={
-                activePreset
-                  ? `Active Preset: ${activePreset.name} (${activePreset.suggestedHeightCm}cm)`
-                  : "Test with Generated Human Photos"
-              }
-              className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
-                samplePresetId && samplePresetId !== "custom"
-                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
-                  : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
-              }`}
-            >
-              <Users className="w-3 h-3 text-cyan-400" />
-              <span>SAMPLES</span>
-              <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
-            </button>
+            {/* Biological Sex Toggle Button */}
+            {onToggleSex && (
+              <button
+                data-testid="btn-toggle-sex"
+                onClick={onToggleSex}
+                title={`Biological Sex: ${biologicalSex.toUpperCase()} (Click to toggle)`}
+                className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
+                  biologicalSex === "female"
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-neon"
+                    : "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
+                }`}
+              >
+                <span>{biologicalSex === "female" ? "♀ FEMALE" : "♂ MALE"}</span>
+              </button>
+            )}
 
-            {showSampleMenu && (
-              <div className="absolute right-0 mt-1 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-30 py-1 text-xs font-mono">
-                <div className="px-3 py-1 text-[10px] text-cyan-400/80 font-semibold uppercase tracking-wider border-b border-slate-800">
-                  AI Human Test Subjects
-                </div>
-                {SAMPLE_HUMANS.map((sample) => (
+            {/* Sample Human Test Subjects Selector Dropdown Menu */}
+            <div className="relative">
+              <button
+                data-testid="btn-sample-toggle"
+                onClick={() => setShowSampleMenu((prev) => !prev)}
+                title={
+                  activePreset
+                    ? `Active Preset: ${activePreset.name} (${activePreset.suggestedHeightCm}cm)`
+                    : "Test with Generated Human Photos"
+                }
+                className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
+                  samplePresetId && samplePresetId !== "custom"
+                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
+                    : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
+                }`}
+              >
+                <Users className="w-3 h-3 text-cyan-400" />
+                <span>SAMPLES</span>
+                <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
+              </button>
+
+              {showSampleMenu && (
+                <div className="absolute right-0 mt-1 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-30 py-1 text-xs font-mono">
+                  <div className="px-3 py-1 text-[10px] text-cyan-400/80 font-semibold uppercase tracking-wider border-b border-slate-800">
+                    AI Human Test Subjects
+                  </div>
+                  {SAMPLE_HUMANS.map((sample) => (
+                    <button
+                      key={sample.id}
+                      data-testid={`btn-sample-${sample.id}`}
+                      onClick={() => {
+                        onSelectSample(sample.id);
+                        setShowSampleMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 transition flex items-center justify-between ${
+                        samplePresetId === sample.id
+                          ? "text-cyan-300 font-bold bg-cyan-500/10"
+                          : "text-slate-300"
+                      }`}
+                    >
+                      <span>{sample.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {sample.suggestedHeightCm}cm
+                      </span>
+                    </button>
+                  ))}
+
                   <button
-                    key={sample.id}
-                    data-testid={`btn-sample-${sample.id}`}
                     onClick={() => {
-                      onSelectSample(sample.id);
+                      fileInputRef.current?.click();
                       setShowSampleMenu(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 transition flex items-center justify-between ${
-                      samplePresetId === sample.id
-                        ? "text-cyan-300 font-bold bg-cyan-500/10"
-                        : "text-slate-300"
-                    }`}
+                    className="w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
                   >
-                    <span>{sample.name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {sample.suggestedHeightCm}cm
+                    <span className="flex items-center space-x-1.5">
+                      <Upload className="w-3 h-3 text-cyan-400" />
+                      <span>Upload Custom Photo</span>
                     </span>
                   </button>
-                ))}
 
-                <button
-                  onClick={() => {
-                    fileInputRef.current?.click();
-                    setShowSampleMenu(false);
-                  }}
-                  className="w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
-                >
-                  <span className="flex items-center space-x-1.5">
-                    <Upload className="w-3 h-3 text-cyan-400" />
-                    <span>Upload Custom Photo</span>
-                  </span>
-                </button>
-
-                {samplePresetId && (
-                  <button
-                    data-testid="btn-sample-clear"
-                    onClick={() => {
-                      onSelectSample(null);
-                      setShowSampleMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-red-500/15 text-red-400 hover:text-red-300 transition border-t border-slate-800 mt-1 pt-1.5"
-                  >
-                    Clear Photo (Standby)
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Compact Simulation Button */}
-          <button
-            data-testid="btn-simulate"
-            onClick={onToggleMock}
-            title={isMock ? "Switch to Live Camera" : "Simulate Biometric Feed"}
-            className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition flex items-center space-x-0.5 ${
-              isMock
-                ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                : "bg-slate-900/80 text-slate-400 hover:text-slate-200 border-slate-700 hover:border-cyan-500/50"
-            }`}
-          >
-            <PlayCircle className="w-2.5 h-2.5" />
-            <span>{isMock ? "LIVE" : "SIM"}</span>
-          </button>
+                  {samplePresetId && (
+                    <button
+                      data-testid="btn-sample-clear"
+                      onClick={() => {
+                        onSelectSample(null);
+                        setShowSampleMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-red-500/15 text-red-400 hover:text-red-300 transition border-t border-slate-800 mt-1 pt-1.5"
+                    >
+                      Clear Photo (Standby)
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
           {!isMock && !sampleImageUrl && isLiveCameraActive && (
             <button

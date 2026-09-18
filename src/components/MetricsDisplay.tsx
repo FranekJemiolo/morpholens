@@ -21,6 +21,8 @@ interface MetricsDisplayProps {
   onUpdateAnchorHeight: (heightCm: number) => void;
   isImperial: boolean;
   onToggleUnits: () => void;
+  biologicalSex?: "male" | "female";
+  onToggleSex?: (sex?: "male" | "female") => void;
 }
 
 export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
@@ -29,6 +31,8 @@ export const MetricsDisplay: React.FC<MetricsDisplayProps> = ({
   onUpdateAnchorHeight,
   isImperial,
   onToggleUnits,
+  biologicalSex = "male",
+  onToggleSex,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isEditingHeight, setIsEditingHeight] = useState(false);
@@ -249,6 +253,39 @@ Tracking Confidence: ${(metrics.confidence * 100).toFixed(0)}%
               </div>
             )}
           </div>
+
+          {/* Biological Sex Selector */}
+          {onToggleSex && (
+            <div className="flex items-center space-x-1 border border-slate-800 rounded-lg p-1 bg-slate-900/60 font-mono text-xs ml-0 sm:ml-4">
+              <span className="text-[10px] text-slate-500 uppercase px-1 hidden sm:inline">
+                SEX:
+              </span>
+              <button
+                data-testid="btn-sex-male"
+                type="button"
+                onClick={() => onToggleSex("male")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                  biologicalSex === "male"
+                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-neon"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                ♂ MALE
+              </button>
+              <button
+                data-testid="btn-sex-female"
+                type="button"
+                onClick={() => onToggleSex("female")}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                  biologicalSex === "female"
+                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/50 shadow-neon"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                ♀ FEMALE
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Units & Export Buttons */}

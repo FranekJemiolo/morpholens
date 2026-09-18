@@ -84,6 +84,8 @@ export interface AnthropometricMetrics {
   confidence: number;
   poseDetected: boolean;
   isDualAngle: boolean;
+  biologicalSex?: "male" | "female";
+  bmi?: number;
   frontSnapshot?: FrontViewMeasurements;
   sideSnapshot?: SideViewMeasurements;
 }
