@@ -1,0 +1,31 @@
+repos:
+  - repo: local
+    hooks:
+      - id: prettier-format
+        name: prettier format
+        description: Run Prettier on staged frontend files
+        entry: npx prettier --check
+        language: system
+        files: \.(ts|tsx|json|css|md)$
+        pass_filenames: true
+
+      - id: lint
+        name: lint
+        description: Run linter
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+
+      - id: type-check
+        name: type check
+        description: Verify TypeScript types
+        entry: npx tsc --noEmit
+        language: system
+        pass_filenames: false
+
+      - id: unit-tests
+        name: unit tests
+        description: Run anthropometric and mathematical unit tests
+        entry: npm run test:unit
+        language: system
+        pass_filenames: false

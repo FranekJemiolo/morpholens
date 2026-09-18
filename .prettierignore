@@ -1,0 +1,6 @@
+node_modules
+dist
+public/wasm
+public/models
+tools/prek
+package-lock.json
