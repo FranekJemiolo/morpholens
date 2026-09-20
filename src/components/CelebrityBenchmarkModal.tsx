@@ -1,11 +1,5 @@
 import React, { useState, useMemo } from "react";
-import {
-  X,
-  Trophy,
-  Sparkles,
-  CheckCircle2,
-  ChevronRight,
-} from "lucide-react";
+import { X, Trophy, Sparkles, CheckCircle2, ChevronRight } from "lucide-react";
 import {
   CELEBRITY_BENCHMARKS,
   generateCelebrityLandmarks,
@@ -30,13 +24,12 @@ const CATEGORIES: { label: string; value: PhysiqueCategory | "All" }[] = [
   { label: "Petite & Compact", value: "Petite & Compact" },
 ];
 
-export const CelebrityBenchmarkModal: React.FC<CelebrityBenchmarkModalProps> = ({
-  isOpen,
-  onClose,
-  onSelectCelebrity,
-  currentSelectedId,
-}) => {
-  const [selectedCategory, setSelectedCategory] = useState<PhysiqueCategory | "All">("All");
+export const CelebrityBenchmarkModal: React.FC<
+  CelebrityBenchmarkModalProps
+> = ({ isOpen, onClose, onSelectCelebrity, currentSelectedId }) => {
+  const [selectedCategory, setSelectedCategory] = useState<
+    PhysiqueCategory | "All"
+  >("All");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredBenchmarks = useMemo(() => {
@@ -67,14 +60,26 @@ export const CelebrityBenchmarkModal: React.FC<CelebrityBenchmarkModalProps> = (
 
     for (const b of CELEBRITY_BENCHMARKS) {
       const landmarks = generateCelebrityLandmarks(b, 640, 480);
-      const metrics = computeAnthropometrics(landmarks, b.heightCm, 640, 480, b.gender);
+      const metrics = computeAnthropometrics(
+        landmarks,
+        b.heightCm,
+        640,
+        480,
+        b.gender,
+      );
       const errorKg = metrics.estimatedWeightKg - b.weightKg;
       const errorPct = (Math.abs(errorKg) / b.weightKg) * 100;
       const accuracyPct = Math.max(90, 100 - errorPct);
 
       map.set(b.id, {
         estimatedWeightKg: metrics.estimatedWeightKg,
-        estimatedBmi: metrics.bmi ?? Number((metrics.estimatedWeightKg / Math.pow(b.heightCm / 100, 2)).toFixed(1)),
+        estimatedBmi:
+          metrics.bmi ??
+          Number(
+            (metrics.estimatedWeightKg / Math.pow(b.heightCm / 100, 2)).toFixed(
+              1,
+            ),
+          ),
         errorKg: Number(errorKg.toFixed(1)),
         errorPct: Number(errorPct.toFixed(1)),
         accuracyPct: Number(accuracyPct.toFixed(1)),
@@ -108,7 +113,8 @@ export const CelebrityBenchmarkModal: React.FC<CelebrityBenchmarkModalProps> = (
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Ground-truth stature and mass profiles spanning strongman, hyper-muscular, slender, and petite extremes.
+                Ground-truth stature and mass profiles spanning strongman,
+                hyper-muscular, slender, and petite extremes.
               </p>
             </div>
           </div>
@@ -228,10 +234,15 @@ export const CelebrityBenchmarkModal: React.FC<CelebrityBenchmarkModalProps> = (
                         <span className="text-[10px] text-cyan-400/80">kg</span>
                         <span
                           className={`text-[10px] font-mono font-bold ml-1 ${
-                            (evalData?.errorKg ?? 0) > 0 ? "text-amber-400" : "text-emerald-400"
+                            (evalData?.errorKg ?? 0) > 0
+                              ? "text-amber-400"
+                              : "text-emerald-400"
                           }`}
                         >
-                          {(evalData?.errorKg ?? 0) > 0 ? `+${evalData?.errorKg}` : evalData?.errorKg}kg
+                          {(evalData?.errorKg ?? 0) > 0
+                            ? `+${evalData?.errorKg}`
+                            : evalData?.errorKg}
+                          kg
                         </span>
                       </div>
                       <div className="flex items-center space-x-1">
@@ -257,7 +268,11 @@ export const CelebrityBenchmarkModal: React.FC<CelebrityBenchmarkModalProps> = (
                   data-testid={`btn-select-celebrity-${b.id}`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>{isSelected ? "Active Calibration Target" : "Test Optical Pose"}</span>
+                  <span>
+                    {isSelected
+                      ? "Active Calibration Target"
+                      : "Test Optical Pose"}
+                  </span>
                   <ChevronRight className="w-3 h-3 ml-auto opacity-70" />
                 </button>
               </div>
@@ -274,11 +289,13 @@ export const CelebrityBenchmarkModal: React.FC<CelebrityBenchmarkModalProps> = (
             </span>
             <span className="hidden sm:inline text-slate-600">•</span>
             <span className="text-slate-400">
-              Calibrated with Ramanujan ellipses, Simpson prismoidal rule &amp; somatotype scaling.
+              Calibrated with Ramanujan ellipses, Simpson prismoidal rule &amp;
+              somatotype scaling.
             </span>
           </div>
           <span className="text-[11px] font-mono text-cyan-400">
-            {filteredBenchmarks.length} of {CELEBRITY_BENCHMARKS.length} figures visible
+            {filteredBenchmarks.length} of {CELEBRITY_BENCHMARKS.length} figures
+            visible
           </span>
         </div>
       </div>

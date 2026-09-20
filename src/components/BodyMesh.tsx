@@ -80,10 +80,10 @@ export const BodyMesh: React.FC<BodyMeshProps> = ({
     scene.background = new THREE.Color("#070B14");
     scene.fog = new THREE.FogExp2("#070B14", 0.04);
 
-    // 2. Camera setup
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-    camera.position.set(0, 1.2, 3.2);
-    camera.lookAt(0, 0.9, 0);
+    // 2. Camera setup - framed to view complete humanoid from head to toe with full clearance above the bottom telemetry bar
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
+    camera.position.set(0, 0.82, 4.4);
+    camera.lookAt(0, 0.8, 0);
     cameraRef.current = camera;
 
     // 3. WebGL Renderer
@@ -97,10 +97,10 @@ export const BodyMesh: React.FC<BodyMeshProps> = ({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
-    controls.target.set(0, 0.95, 0);
+    controls.target.set(0, 0.8, 0);
     controls.maxPolarAngle = Math.PI / 2 + 0.1;
     controls.minDistance = 1.5;
-    controls.maxDistance = 5.5;
+    controls.maxDistance = 6.0;
     controlsRef.current = controls;
 
     // 5. Studio Lighting
@@ -448,8 +448,8 @@ export const BodyMesh: React.FC<BodyMeshProps> = ({
 
   const handleResetCamera = () => {
     if (cameraRef.current && controlsRef.current) {
-      cameraRef.current.position.set(0, 1.2, 3.2);
-      controlsRef.current.target.set(0, 0.95, 0);
+      cameraRef.current.position.set(0, 0.82, 4.4);
+      controlsRef.current.target.set(0, 0.8, 0);
       controlsRef.current.update();
     }
   };

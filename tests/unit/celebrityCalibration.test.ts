@@ -24,8 +24,12 @@ describe("Celebrity Calibration & Extreme Physique Validation Suite", () => {
 
   it("evaluates all 20 celebrity benchmarks with high fidelity and low MAPE", () => {
     let totalAbsPercentageError = 0;
-    const errors: { name: string; trueWeight: number; estimated: number; errorPct: number }[] =
-      [];
+    const errors: {
+      name: string;
+      trueWeight: number;
+      estimated: number;
+      errorPct: number;
+    }[] = [];
 
     for (const benchmark of CELEBRITY_BENCHMARKS) {
       const landmarks = generateCelebrityLandmarks(benchmark, 640, 480);
@@ -40,7 +44,9 @@ describe("Celebrity Calibration & Extreme Physique Validation Suite", () => {
       expect(metrics.poseDetected).toBe(true);
       expect(metrics.estimatedWeightKg).toBeGreaterThan(0);
 
-      const absErrorKg = Math.abs(metrics.estimatedWeightKg - benchmark.weightKg);
+      const absErrorKg = Math.abs(
+        metrics.estimatedWeightKg - benchmark.weightKg,
+      );
       const errorPct = (absErrorKg / benchmark.weightKg) * 100;
       totalAbsPercentageError += errorPct;
 
@@ -67,7 +73,13 @@ describe("Celebrity Calibration & Extreme Physique Validation Suite", () => {
     it("accurately predicts extreme strongman mass for Eddie Hall (~160kg) without BMI clipping", () => {
       const eddie = CELEBRITY_BENCHMARKS.find((b) => b.id === "eddie-hall")!;
       const landmarks = generateCelebrityLandmarks(eddie);
-      const metrics = computeAnthropometrics(landmarks, eddie.heightCm, 640, 480, eddie.gender);
+      const metrics = computeAnthropometrics(
+        landmarks,
+        eddie.heightCm,
+        640,
+        480,
+        eddie.gender,
+      );
 
       expect(metrics.estimatedWeightKg).toBeGreaterThanOrEqual(148);
       expect(metrics.estimatedWeightKg).toBeLessThanOrEqual(168);
@@ -75,18 +87,34 @@ describe("Celebrity Calibration & Extreme Physique Validation Suite", () => {
     });
 
     it("accurately predicts tall colossus mass for Shaquille O'Neal (216cm, 147kg)", () => {
-      const shaq = CELEBRITY_BENCHMARKS.find((b) => b.id === "shaquille-oneal")!;
+      const shaq = CELEBRITY_BENCHMARKS.find(
+        (b) => b.id === "shaquille-oneal",
+      )!;
       const landmarks = generateCelebrityLandmarks(shaq);
-      const metrics = computeAnthropometrics(landmarks, shaq.heightCm, 640, 480, shaq.gender);
+      const metrics = computeAnthropometrics(
+        landmarks,
+        shaq.heightCm,
+        640,
+        480,
+        shaq.gender,
+      );
 
       expect(metrics.estimatedWeightKg).toBeGreaterThanOrEqual(136);
       expect(metrics.estimatedWeightKg).toBeLessThanOrEqual(158);
     });
 
     it("accurately predicts peak bodybuilding V-taper for Arnold Schwarzenegger (188cm, 107kg)", () => {
-      const arnold = CELEBRITY_BENCHMARKS.find((b) => b.id === "arnold-schwarzenegger")!;
+      const arnold = CELEBRITY_BENCHMARKS.find(
+        (b) => b.id === "arnold-schwarzenegger",
+      )!;
       const landmarks = generateCelebrityLandmarks(arnold);
-      const metrics = computeAnthropometrics(landmarks, arnold.heightCm, 640, 480, arnold.gender);
+      const metrics = computeAnthropometrics(
+        landmarks,
+        arnold.heightCm,
+        640,
+        480,
+        arnold.gender,
+      );
 
       expect(metrics.estimatedWeightKg).toBeGreaterThanOrEqual(100);
       expect(metrics.estimatedWeightKg).toBeLessThanOrEqual(114);
@@ -95,16 +123,30 @@ describe("Celebrity Calibration & Extreme Physique Validation Suite", () => {
     it("accurately predicts compact muscular gymnast mass for Simone Biles (142cm, 47kg)", () => {
       const simone = CELEBRITY_BENCHMARKS.find((b) => b.id === "simone-biles")!;
       const landmarks = generateCelebrityLandmarks(simone);
-      const metrics = computeAnthropometrics(landmarks, simone.heightCm, 640, 480, simone.gender);
+      const metrics = computeAnthropometrics(
+        landmarks,
+        simone.heightCm,
+        640,
+        480,
+        simone.gender,
+      );
 
       expect(metrics.estimatedWeightKg).toBeGreaterThanOrEqual(43);
       expect(metrics.estimatedWeightKg).toBeLessThanOrEqual(50);
     });
 
     it("accurately predicts slender ectomorph mass for Timothée Chalamet (178cm, 65kg)", () => {
-      const timothee = CELEBRITY_BENCHMARKS.find((b) => b.id === "timothee-chalamet")!;
+      const timothee = CELEBRITY_BENCHMARKS.find(
+        (b) => b.id === "timothee-chalamet",
+      )!;
       const landmarks = generateCelebrityLandmarks(timothee);
-      const metrics = computeAnthropometrics(landmarks, timothee.heightCm, 640, 480, timothee.gender);
+      const metrics = computeAnthropometrics(
+        landmarks,
+        timothee.heightCm,
+        640,
+        480,
+        timothee.gender,
+      );
 
       expect(metrics.estimatedWeightKg).toBeGreaterThanOrEqual(61);
       expect(metrics.estimatedWeightKg).toBeLessThanOrEqual(69);

@@ -14,6 +14,26 @@ Powered by Google MediaPipe Tasks Vision (`@mediapipe/tasks-vision`) compiled to
 
 ---
 
+## Visual Showcase & Sample Benchmarks
+
+MorphoLens delivers complete full-body anthropometric tracking, real-time MediaPipe skeletal joint caliper estimation, and procedural 3D avatar mesh morphing with zero cloud latency:
+
+### Full-Body Biometric Analysis & 3D Mesh Morphing
+
+|                                     Male Subject Full-Body Biometrics                                      |                                 Female Subject & Dual-Viewport Analysis                                 |
+| :--------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------: |
+|          ![MorphoLens Male Subject Full Body Analysis](./docs/images/morpholens-sample-male.png)           |       ![MorphoLens Female Subject Full Body Analysis](./docs/images/morpholens-sample-female.png)       |
+| _Full head-to-toe 33-point MediaPipe tracking, biacromial & bi-iliac calipers, and synchronized 3D avatar_ | _Automatic biological sex detection (`♀ FEMALE`), gynoid pelvic contouring, and composite body density_ |
+
+### Ground-Truth Calibration & Extreme Somatotype Stress Tests
+
+|                                       20-Figure Celebrity Calibration Suite                                       |                                        Heavyweight Strongman Extreme (Eddie Hall)                                         |
+| :---------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------: |
+|            ![20 Celebrity Benchmark Profiles Suite](./docs/images/morpholens-celebrity-benchmarks.png)            |               ![Extreme Strongman Calibration (Eddie Hall)](./docs/images/morpholens-extreme-strongman.png)               |
+| _Comprehensive 20-profile validation suite across strongmen, bodybuilders, athletic runners, and petite athletes_ | _Stress testing extreme physique mass (predicted $160.3\text{ kg}$ vs $160.0\text{ kg}$ ground truth, $99.8\%$ accuracy)_ |
+
+---
+
 ## Key Highlights
 
 - **100% Edge Inference (Zero Cloud Compute):** AI inference runs entirely on the client using WebAssembly SIMD and WebGL acceleration. No frames, video streams, or biometric data are ever transmitted to a server.

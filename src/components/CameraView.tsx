@@ -141,7 +141,6 @@ export const CameraView: React.FC<CameraViewProps> = ({
         }
       }
 
-      // 2. Viewport Silhouette Alignment Guide
       const alignmentColor =
         quality?.alignmentState === "locked"
           ? "#10B981" // Emerald Green
@@ -149,46 +148,52 @@ export const CameraView: React.FC<CameraViewProps> = ({
             ? "#38BDF8" // Electric Cyan
             : "#F59E0B"; // Amber / Out of frame
 
-      ctx.save();
-      ctx.strokeStyle = alignmentColor;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 6]);
-      ctx.globalAlpha = 0.35;
+      // 2. Viewport Silhouette Alignment Guide (displayed only during initial alignment or standby, not over active tracked landmarks)
+      if (
+        !landmarks &&
+        (!sampleImageUrl || quality?.alignmentState !== "locked")
+      ) {
+        ctx.save();
+        ctx.strokeStyle = alignmentColor;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.globalAlpha = 0.35;
 
-      // Draw stylized body silhouette stencil
-      const cx = width / 2;
-      const headR = height * 0.07;
-      const headY = height * 0.16;
+        // Draw stylized body silhouette stencil
+        const cx = width / 2;
+        const headR = height * 0.07;
+        const headY = height * 0.16;
 
-      // Head circle
-      ctx.beginPath();
-      ctx.arc(cx, headY, headR, 0, Math.PI * 2);
-      ctx.stroke();
+        // Head circle
+        ctx.beginPath();
+        ctx.arc(cx, headY, headR, 0, Math.PI * 2);
+        ctx.stroke();
 
-      // Torso & Shoulders
-      const sWidth = width * 0.28;
-      const hipWidth = width * 0.22;
-      const sY = headY + headR + height * 0.04;
-      const hipY = sY + height * 0.24;
+        // Torso & Shoulders
+        const sWidth = width * 0.28;
+        const hipWidth = width * 0.22;
+        const sY = headY + headR + height * 0.04;
+        const hipY = sY + height * 0.24;
 
-      ctx.beginPath();
-      ctx.moveTo(cx - sWidth / 2, sY);
-      ctx.lineTo(cx + sWidth / 2, sY);
-      ctx.lineTo(cx + hipWidth / 2, hipY);
-      ctx.lineTo(cx - hipWidth / 2, hipY);
-      ctx.closePath();
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - sWidth / 2, sY);
+        ctx.lineTo(cx + sWidth / 2, sY);
+        ctx.lineTo(cx + hipWidth / 2, hipY);
+        ctx.lineTo(cx - hipWidth / 2, hipY);
+        ctx.closePath();
+        ctx.stroke();
 
-      // Legs guide
-      const footY = height * 0.9;
-      ctx.beginPath();
-      ctx.moveTo(cx - hipWidth * 0.35, hipY);
-      ctx.lineTo(cx - hipWidth * 0.35, footY);
-      ctx.moveTo(cx + hipWidth * 0.35, hipY);
-      ctx.lineTo(cx + hipWidth * 0.35, footY);
-      ctx.stroke();
+        // Legs guide
+        const footY = height * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(cx - hipWidth * 0.35, hipY);
+        ctx.lineTo(cx - hipWidth * 0.35, footY);
+        ctx.moveTo(cx + hipWidth * 0.35, hipY);
+        ctx.lineTo(cx + hipWidth * 0.35, footY);
+        ctx.stroke();
 
-      ctx.restore();
+        ctx.restore();
+      }
 
       // 3. HUD Corner Viewfinder Brackets
       const bSize = 24;
@@ -225,7 +230,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
 
       // 4. Draw Skeleton with Aspect-Ratio Projection Correction
       if (landmarks && landmarks.length >= 33) {
-        // Project normalized landmarks to canvas coordinates taking object-fit:cover into account
+        // Project normalized landmarks to canvas coordinates taking object-fit: contain into account
         const isMirrored = !sampleImageUrl && facingMode === "user";
         const projectedPoints = landmarks.map((lm) =>
           projectToCanvas(
@@ -235,6 +240,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
             videoWidth,
             videoHeight,
             isMirrored,
+            "contain",
           ),
         );
 
@@ -412,7 +418,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
               e.currentTarget.naturalHeight,
             )
           }
-          className="absolute inset-0 w-full h-full object-cover select-none"
+          className="absolute inset-0 w-full h-full object-contain select-none"
         />
       ) : (
         <video
@@ -420,7 +426,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
           autoPlay
           playsInline
           muted
-          className={`absolute inset-0 w-full h-full object-cover ${
+          className={`absolute inset-0 w-full h-full object-contain ${
             facingMode === "user" ? "-scale-x-100" : ""
           } ${isMock ? "opacity-0" : "opacity-100"}`}
         />
@@ -566,136 +572,136 @@ export const CameraView: React.FC<CameraViewProps> = ({
             </button>
           )}
 
-            {/* Hidden File Input for Custom Uploads */}
-            <input
-              ref={fileInputRef}
-              data-testid="input-file-upload"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
+          {/* Hidden File Input for Custom Uploads */}
+          <input
+            ref={fileInputRef}
+            data-testid="input-file-upload"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
 
-            {/* Orientation Toggle for Custom Uploaded Photo */}
-            {samplePresetId === "custom" && onToggleCustomOrientation && (
-              <button
-                data-testid="btn-toggle-custom-angle"
-                onClick={onToggleCustomOrientation}
-                title="Toggle Front standing view vs Side profile view"
-                className="px-1.5 py-0.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 rounded text-[10px] font-mono transition flex items-center space-x-1"
-              >
-                <span className="text-[9px] text-slate-400">ANGLE:</span>
-                <span className="font-bold uppercase">
-                  {customOrientation || "front"}
-                </span>
-              </button>
-            )}
+          {/* Orientation Toggle for Custom Uploaded Photo */}
+          {samplePresetId === "custom" && onToggleCustomOrientation && (
+            <button
+              data-testid="btn-toggle-custom-angle"
+              onClick={onToggleCustomOrientation}
+              title="Toggle Front standing view vs Side profile view"
+              className="px-1.5 py-0.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 rounded text-[10px] font-mono transition flex items-center space-x-1"
+            >
+              <span className="text-[9px] text-slate-400">ANGLE:</span>
+              <span className="font-bold uppercase">
+                {customOrientation || "front"}
+              </span>
+            </button>
+          )}
 
-            {/* Biological Sex Toggle Button */}
-            {onToggleSex && (
-              <button
-                data-testid="btn-toggle-sex"
-                onClick={onToggleSex}
-                title={`Biological Sex: ${biologicalSex.toUpperCase()} (Click to toggle)`}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
-                  biologicalSex === "female"
-                    ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-neon"
-                    : "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
-                }`}
-              >
-                <span>{biologicalSex === "female" ? "♀ FEMALE" : "♂ MALE"}</span>
-              </button>
-            )}
+          {/* Biological Sex Toggle Button */}
+          {onToggleSex && (
+            <button
+              data-testid="btn-toggle-sex"
+              onClick={onToggleSex}
+              title={`Biological Sex: ${biologicalSex.toUpperCase()} (Click to toggle)`}
+              className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
+                biologicalSex === "female"
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-neon"
+                  : "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
+              }`}
+            >
+              <span>{biologicalSex === "female" ? "♀ FEMALE" : "♂ MALE"}</span>
+            </button>
+          )}
 
-            {/* Sample Human Test Subjects Selector Dropdown Menu */}
-            <div className="relative">
-              <button
-                data-testid="btn-sample-toggle"
-                onClick={() => setShowSampleMenu((prev) => !prev)}
-                title={
-                  activePreset
-                    ? `Active Preset: ${activePreset.name} (${activePreset.suggestedHeightCm}cm)`
-                    : "Test with Generated Human Photos"
-                }
-                className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
-                  samplePresetId && samplePresetId !== "custom"
-                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
-                    : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
-                }`}
-              >
-                <Users className="w-3 h-3 text-cyan-400" />
-                <span>SAMPLES</span>
-                <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
-              </button>
+          {/* Sample Human Test Subjects Selector Dropdown Menu */}
+          <div className="relative">
+            <button
+              data-testid="btn-sample-toggle"
+              onClick={() => setShowSampleMenu((prev) => !prev)}
+              title={
+                activePreset
+                  ? `Active Preset: ${activePreset.name} (${activePreset.suggestedHeightCm}cm)`
+                  : "Test with Generated Human Photos"
+              }
+              className={`px-2 py-0.5 rounded text-[11px] font-mono border transition flex items-center space-x-1 ${
+                samplePresetId && samplePresetId !== "custom"
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-neon"
+                  : "bg-slate-900/80 text-slate-300 border-slate-700 hover:border-cyan-500/50"
+              }`}
+            >
+              <Users className="w-3 h-3 text-cyan-400" />
+              <span>SAMPLES</span>
+              <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
+            </button>
 
-              {showSampleMenu && (
-                <div className="absolute right-0 mt-1 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-30 py-1 text-xs font-mono">
-                  <div className="px-3 py-1 text-[10px] text-cyan-400/80 font-semibold uppercase tracking-wider border-b border-slate-800">
-                    AI Human Test Subjects
-                  </div>
-                  {SAMPLE_HUMANS.map((sample) => (
-                    <button
-                      key={sample.id}
-                      data-testid={`btn-sample-${sample.id}`}
-                      onClick={() => {
-                        onSelectSample(sample.id);
-                        setShowSampleMenu(false);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 transition flex items-center justify-between ${
-                        samplePresetId === sample.id
-                          ? "text-cyan-300 font-bold bg-cyan-500/10"
-                          : "text-slate-300"
-                      }`}
-                    >
-                      <span>{sample.name}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {sample.suggestedHeightCm}cm
-                      </span>
-                    </button>
-                  ))}
-
-                  <button
-                    onClick={() => {
-                      fileInputRef.current?.click();
-                      setShowSampleMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
-                  >
-                    <span className="flex items-center space-x-1.5">
-                      <Upload className="w-3 h-3 text-cyan-400" />
-                      <span>Upload Custom Photo</span>
-                    </span>
-                  </button>
-
-                  <button
-                    data-testid="btn-open-benchmarks-dropdown"
-                    onClick={() => {
-                      onOpenBenchmarks?.();
-                      setShowSampleMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-amber-500/15 text-amber-300 hover:text-amber-200 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
-                  >
-                    <span className="flex items-center space-x-1.5">
-                      <Trophy className="w-3 h-3 text-amber-400" />
-                      <span>⭐ 20 Celebrity Benchmarks...</span>
-                    </span>
-                  </button>
-
-                  {samplePresetId && (
-                    <button
-                      data-testid="btn-sample-clear"
-                      onClick={() => {
-                        onSelectSample(null);
-                        setShowSampleMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-red-500/15 text-red-400 hover:text-red-300 transition border-t border-slate-800 mt-1 pt-1.5"
-                    >
-                      Clear Photo (Standby)
-                    </button>
-                  )}
+            {showSampleMenu && (
+              <div className="absolute right-0 mt-1 w-52 bg-slate-950/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-30 py-1 text-xs font-mono">
+                <div className="px-3 py-1 text-[10px] text-cyan-400/80 font-semibold uppercase tracking-wider border-b border-slate-800">
+                  AI Human Test Subjects
                 </div>
-              )}
-            </div>
+                {SAMPLE_HUMANS.map((sample) => (
+                  <button
+                    key={sample.id}
+                    data-testid={`btn-sample-${sample.id}`}
+                    onClick={() => {
+                      onSelectSample(sample.id);
+                      setShowSampleMenu(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 transition flex items-center justify-between ${
+                      samplePresetId === sample.id
+                        ? "text-cyan-300 font-bold bg-cyan-500/10"
+                        : "text-slate-300"
+                    }`}
+                  >
+                    <span>{sample.name}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {sample.suggestedHeightCm}cm
+                    </span>
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setShowSampleMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
+                >
+                  <span className="flex items-center space-x-1.5">
+                    <Upload className="w-3 h-3 text-cyan-400" />
+                    <span>Upload Custom Photo</span>
+                  </span>
+                </button>
+
+                <button
+                  data-testid="btn-open-benchmarks-dropdown"
+                  onClick={() => {
+                    onOpenBenchmarks?.();
+                    setShowSampleMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-amber-500/15 text-amber-300 hover:text-amber-200 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
+                >
+                  <span className="flex items-center space-x-1.5">
+                    <Trophy className="w-3 h-3 text-amber-400" />
+                    <span>⭐ 20 Celebrity Benchmarks...</span>
+                  </span>
+                </button>
+
+                {samplePresetId && (
+                  <button
+                    data-testid="btn-sample-clear"
+                    onClick={() => {
+                      onSelectSample(null);
+                      setShowSampleMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-red-500/15 text-red-400 hover:text-red-300 transition border-t border-slate-800 mt-1 pt-1.5"
+                  >
+                    Clear Photo (Standby)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {activeCelebrityName && (
             <div
@@ -704,7 +710,9 @@ export const CameraView: React.FC<CameraViewProps> = ({
               data-testid="badge-active-celebrity"
             >
               <Trophy className="w-2.5 h-2.5 text-amber-400" />
-              <span className="font-bold truncate max-w-[120px]">{activeCelebrityName}</span>
+              <span className="font-bold truncate max-w-[120px]">
+                {activeCelebrityName}
+              </span>
             </div>
           )}
 
@@ -720,31 +728,30 @@ export const CameraView: React.FC<CameraViewProps> = ({
         </div>
       </div>
 
-      {/* Actionable Pose Quality Feedback Banner - positioned cleanly at bottom */}
-      {quality && quality.feedbackMessage && (
-        <div className="absolute bottom-4 inset-x-4 z-20 flex justify-center pointer-events-none">
-          <div
-            className={`px-4 py-1.5 rounded-full border backdrop-blur-md text-xs font-mono flex items-center space-x-2 shadow-lg transition-all ${
-              quality.alignmentState === "locked"
-                ? "bg-emerald-950/85 border-emerald-500/50 text-emerald-300"
-                : quality.alignmentState === "aligning"
+      {/* Actionable Pose Quality Feedback Banner - positioned near top during alignment, never obstructing subject's feet */}
+      {quality &&
+        quality.feedbackMessage &&
+        quality.alignmentState !== "locked" &&
+        !sampleImageUrl && (
+          <div className="absolute top-12 inset-x-4 z-20 flex justify-center pointer-events-none">
+            <div
+              className={`px-4 py-1.5 rounded-full border backdrop-blur-md text-xs font-mono flex items-center space-x-2 shadow-lg transition-all ${
+                quality.alignmentState === "aligning"
                   ? "bg-slate-900/85 border-cyan-500/30 text-cyan-300"
                   : "bg-amber-950/85 border-amber-500/50 text-amber-300"
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                quality.alignmentState === "locked"
-                  ? "bg-emerald-400 animate-ping"
-                  : quality.alignmentState === "aligning"
-                    ? "bg-cyan-400"
-                    : "bg-amber-400 animate-pulse"
               }`}
-            />
-            <span>{quality.feedbackMessage}</span>
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  quality.alignmentState === "aligning"
+                    ? "bg-cyan-400 animate-pulse"
+                    : "bg-amber-400 animate-ping"
+                }`}
+              />
+              <span>{quality.feedbackMessage}</span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Countdown Overlay */}
       {countdown !== null && (

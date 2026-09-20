@@ -7,7 +7,8 @@ export type PhysiqueCategory =
   | "Slender & Ectomorph"
   | "Petite & Compact";
 
-export type Somatotype = "ectomorph" | "mesomorph" | "endomorph" | "hyper-muscular";
+export type Somatotype =
+  "ectomorph" | "mesomorph" | "endomorph" | "hyper-muscular";
 
 export interface CelebrityBenchmark {
   id: string;
@@ -24,10 +25,10 @@ export interface CelebrityBenchmark {
   achievements: string;
   proportions: {
     shoulderSpanRatio: number; // biacromial / stature (e.g. 0.21 - 0.30)
-    hipSpanRatio: number;      // bi-iliac / stature (e.g. 0.17 - 0.25)
-    torsoRatio: number;        // torso length / stature (e.g. 0.28 - 0.34)
-    armSpanRatio: number;      // wingspan / stature (e.g. 1.00 - 1.08)
-    chestDepthRatio: number;   // sagittal chest / shoulder span (e.g. 0.55 - 0.72)
+    hipSpanRatio: number; // bi-iliac / stature (e.g. 0.17 - 0.25)
+    torsoRatio: number; // torso length / stature (e.g. 0.28 - 0.34)
+    armSpanRatio: number; // wingspan / stature (e.g. 1.00 - 1.08)
+    chestDepthRatio: number; // sagittal chest / shoulder span (e.g. 0.55 - 0.72)
   };
 }
 
@@ -66,11 +67,12 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
     somatotype: "hyper-muscular",
     archetype: "Tall Strongman Extreme Colossus",
     bio: "Iconic Icelandic strongman ('The Mountain') and 2018 WSM winner. Combines massive 206 cm stature with dense muscular bone thickness.",
-    achievements: "501kg deadlift world record, Arnold Strongman Classic 3x Champion",
+    achievements:
+      "501kg deadlift world record, Arnold Strongman Classic 3x Champion",
     proportions: {
       shoulderSpanRatio: 0.252,
       hipSpanRatio: 0.194,
-      torsoRatio: 0.310,
+      torsoRatio: 0.31,
       armSpanRatio: 1.06,
       chestDepthRatio: 0.64,
     },
@@ -93,7 +95,7 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
       hipSpanRatio: 0.174,
       torsoRatio: 0.302,
       armSpanRatio: 1.07,
-      chestDepthRatio: 0.60,
+      chestDepthRatio: 0.6,
     },
   },
   {
@@ -114,7 +116,7 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
       hipSpanRatio: 0.174,
       torsoRatio: 0.302,
       armSpanRatio: 1.08,
-      chestDepthRatio: 0.60,
+      chestDepthRatio: 0.6,
     },
   },
 
@@ -177,7 +179,7 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
     bio: "Global football superstar renowned for meticulous conditioning, explosive power, and razor-sharp lean muscular definition.",
     achievements: "5x Ballon d'Or, 5x Champions League Champion",
     proportions: {
-      shoulderSpanRatio: 0.230,
+      shoulderSpanRatio: 0.23,
       hipSpanRatio: 0.168,
       torsoRatio: 0.298,
       armSpanRatio: 1.02,
@@ -202,7 +204,7 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
       hipSpanRatio: 0.168,
       torsoRatio: 0.288,
       armSpanRatio: 1.05,
-      chestDepthRatio: 0.60,
+      chestDepthRatio: 0.6,
     },
   },
   {
@@ -262,10 +264,10 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
     achievements: "UFC Featherweight & Lightweight Double Champion",
     proportions: {
       shoulderSpanRatio: 0.238,
-      hipSpanRatio: 0.170,
+      hipSpanRatio: 0.17,
       torsoRatio: 0.298,
       armSpanRatio: 1.06,
-      chestDepthRatio: 0.60,
+      chestDepthRatio: 0.6,
     },
   },
   {
@@ -280,10 +282,11 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
     somatotype: "mesomorph",
     archetype: "Judo & MMA Combat Athlete",
     bio: "Olympic Judo medalist and UFC Hall of Famer known for dense upper body power and martial arts core strength.",
-    achievements: "Olympic Bronze Medalist, Inaugural UFC Women's Bantamweight Champion",
+    achievements:
+      "Olympic Bronze Medalist, Inaugural UFC Women's Bantamweight Champion",
     proportions: {
-      shoulderSpanRatio: 0.210,
-      hipSpanRatio: 0.180,
+      shoulderSpanRatio: 0.21,
+      hipSpanRatio: 0.18,
       torsoRatio: 0.298,
       armSpanRatio: 1.01,
       chestDepthRatio: 0.56,
@@ -329,7 +332,7 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
       shoulderSpanRatio: 0.215,
       hipSpanRatio: 0.162,
       torsoRatio: 0.294,
-      armSpanRatio: 1.00,
+      armSpanRatio: 1.0,
       chestDepthRatio: 0.55,
     },
   },
@@ -391,8 +394,8 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
     proportions: {
       shoulderSpanRatio: 0.198,
       hipSpanRatio: 0.172,
-      torsoRatio: 0.290,
-      armSpanRatio: 1.00,
+      torsoRatio: 0.29,
+      armSpanRatio: 1.0,
       chestDepthRatio: 0.53,
     },
   },
@@ -413,7 +416,7 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
     achievements: "11 Olympic Medals (7 Gold), 30 World Championship Medals",
     proportions: {
       shoulderSpanRatio: 0.224,
-      hipSpanRatio: 0.190,
+      hipSpanRatio: 0.19,
       torsoRatio: 0.304,
       armSpanRatio: 1.03,
       chestDepthRatio: 0.58,
@@ -457,7 +460,7 @@ export const CELEBRITY_BENCHMARKS: CelebrityBenchmark[] = [
       shoulderSpanRatio: 0.198,
       hipSpanRatio: 0.192,
       torsoRatio: 0.298,
-      armSpanRatio: 1.00,
+      armSpanRatio: 1.0,
       chestDepthRatio: 0.55,
     },
   },
@@ -485,8 +488,7 @@ export function generateCelebrityLandmarks(
   // Head and neck points
   const noseY = headApexY + heightSpan * 0.055;
   const earY = headApexY + heightSpan * 0.052;
-  const earDx =
-    0.035 * (p.shoulderSpanRatio / 0.24) * aspectCorrection;
+  const earDx = 0.035 * (p.shoulderSpanRatio / 0.24) * aspectCorrection;
 
   // Shoulders
   const shoulderY = headApexY + heightSpan * 0.165;
@@ -555,9 +557,19 @@ export function generateCelebrityLandmarks(
       case 30: // Right heel
         return { x: rHipX - 0.01, y: heelY, z: -0.02, visibility: 0.95 };
       case 31: // Left toe
-        return { x: lHipX + 0.012, y: heelY + 0.015, z: 0.05, visibility: 0.95 };
+        return {
+          x: lHipX + 0.012,
+          y: heelY + 0.015,
+          z: 0.05,
+          visibility: 0.95,
+        };
       case 32: // Right toe
-        return { x: rHipX - 0.012, y: heelY + 0.015, z: 0.05, visibility: 0.95 };
+        return {
+          x: rHipX - 0.012,
+          y: heelY + 0.015,
+          z: 0.05,
+          visibility: 0.95,
+        };
       default:
         return base;
     }

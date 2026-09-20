@@ -37,14 +37,59 @@ describe("Anthropometrics Math & Regression Engine", () => {
     it("projects coordinates with object-fit: cover aspect ratio correction", () => {
       const lm = { x: 0.5, y: 0.5, z: 0.0 };
       // Wider video (16:9) inside square canvas (1:1): horizontally cropped
-      const projWider = projectToCanvas(lm, 600, 600, 1920, 1080, false);
+      const projWider = projectToCanvas(
+        lm,
+        600,
+        600,
+        1920,
+        1080,
+        false,
+        "cover",
+      );
       expect(projWider.x).toBeCloseTo(300, 1); // center remains centered
       expect(projWider.y).toBeCloseTo(300, 1);
 
       // Taller video (4:3) inside wide canvas (16:9): vertically cropped
-      const projTaller = projectToCanvas(lm, 1600, 900, 640, 480, false);
+      const projTaller = projectToCanvas(
+        lm,
+        1600,
+        900,
+        640,
+        480,
+        false,
+        "cover",
+      );
       expect(projTaller.x).toBeCloseTo(800, 1);
       expect(projTaller.y).toBeCloseTo(450, 1);
+    });
+
+    it("projects coordinates with object-fit: contain without cropping head or feet", () => {
+      const headTop = { x: 0.5, y: 0.0, z: 0.0 };
+      const feetBottom = { x: 0.5, y: 1.0, z: 0.0 };
+      // Portrait image (896x1200) inside landscape container (600x400)
+      const projHead = projectToCanvas(
+        headTop,
+        600,
+        400,
+        896,
+        1200,
+        false,
+        "contain",
+      );
+      const projFeet = projectToCanvas(
+        feetBottom,
+        600,
+        400,
+        896,
+        1200,
+        false,
+        "contain",
+      );
+
+      expect(projHead.y).toBeCloseTo(0, 1);
+      expect(projFeet.y).toBeCloseTo(400, 1);
+      expect(projHead.x).toBeCloseTo(300, 1);
+      expect(projFeet.x).toBeCloseTo(300, 1);
     });
   });
 
@@ -85,7 +130,12 @@ describe("Anthropometrics Math & Regression Engine", () => {
       });
 
       const fullScale = computeOpticalScale(standardFrontPose, 180, 640, 480);
-      const reconstructedScale = computeOpticalScale(poseWithoutFeet, 180, 640, 480);
+      const reconstructedScale = computeOpticalScale(
+        poseWithoutFeet,
+        180,
+        640,
+        480,
+      );
 
       // Reconstructed stature should be within 10% of full stature rather than collapsing
       expect(reconstructedScale.scaleFactor).toBeGreaterThan(0.2);
@@ -229,4 +279,3 @@ describe("Anthropometrics Math & Regression Engine", () => {
     });
   });
 });
-

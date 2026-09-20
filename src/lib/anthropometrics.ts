@@ -38,7 +38,7 @@ export function euclideanDistance3D(
 
 /**
  * Projects a normalized landmark (0..1) to canvas display coordinates
- * accounting for CSS object-fit: cover scaling and horizontal selfie mirroring.
+ * accounting for CSS object-fit: contain or cover scaling and horizontal selfie mirroring.
  */
 export function projectToCanvas(
   lm: NormalizedLandmark,
@@ -47,6 +47,7 @@ export function projectToCanvas(
   videoWidth: number,
   videoHeight: number,
   isMirrored = true,
+  fit: "contain" | "cover" = "contain",
 ): { x: number; y: number; z: number; visibility: number } {
   if (videoWidth <= 0 || videoHeight <= 0) {
     const normX = isMirrored ? 1 - lm.x : lm.x;
@@ -66,16 +67,31 @@ export function projectToCanvas(
   let offsetX = 0;
   let offsetY = 0;
 
-  if (videoAspect > canvasAspect) {
-    // Video is wider than canvas: horizontally cropped
-    renderedH = canvasHeight;
-    renderedW = canvasHeight * videoAspect;
-    offsetX = (canvasWidth - renderedW) / 2;
+  if (fit === "contain") {
+    if (videoAspect > canvasAspect) {
+      // Video/image is wider than canvas: horizontally fit, vertically letterboxed
+      renderedW = canvasWidth;
+      renderedH = canvasWidth / videoAspect;
+      offsetY = (canvasHeight - renderedH) / 2;
+    } else {
+      // Video/image is taller than canvas (e.g. full-body portrait): vertically fit, horizontally pillarboxed
+      renderedH = canvasHeight;
+      renderedW = canvasHeight * videoAspect;
+      offsetX = (canvasWidth - renderedW) / 2;
+    }
   } else {
-    // Video is taller than canvas: vertically cropped
-    renderedW = canvasWidth;
-    renderedH = canvasWidth / videoAspect;
-    offsetY = (canvasHeight - renderedH) / 2;
+    // cover mode
+    if (videoAspect > canvasAspect) {
+      // Video is wider than canvas: horizontally cropped
+      renderedH = canvasHeight;
+      renderedW = canvasHeight * videoAspect;
+      offsetX = (canvasWidth - renderedW) / 2;
+    } else {
+      // Video is taller than canvas: vertically cropped
+      renderedW = canvasWidth;
+      renderedH = canvasWidth / videoAspect;
+      offsetY = (canvasHeight - renderedH) / 2;
+    }
   }
 
   const rawX = isMirrored ? 1 - lm.x : lm.x;
@@ -149,7 +165,12 @@ export function computeOpticalScale(
     const kneeMidY = ((lKnee.y + rKnee.y) / 2) * canvasHeight;
     const vertexToKneePx = Math.max(50, kneeMidY - cranialApexY);
     detectedHeightPx = vertexToKneePx / 0.715;
-  } else if (isFeetTruncated && lHip && rHip && (lHip.visibility ?? 0.8) > 0.4) {
+  } else if (
+    isFeetTruncated &&
+    lHip &&
+    rHip &&
+    (lHip.visibility ?? 0.8) > 0.4
+  ) {
     // Hips are visible: Vertex to Greater Trochanter is ~47% of stature
     const hipMidY = ((lHip.y + rHip.y) / 2) * canvasHeight;
     const vertexToHipPx = Math.max(30, hipMidY - cranialApexY);
@@ -537,8 +558,8 @@ export function classifySomatotype(
     return "hyper-muscular";
   }
   if (
-    shoulderRatio <= (isFemale ? 0.210 : 0.224) &&
-    hipRatio <= (isFemale ? 0.200 : 0.180)
+    shoulderRatio <= (isFemale ? 0.21 : 0.224) &&
+    hipRatio <= (isFemale ? 0.2 : 0.18)
   ) {
     return "ectomorph";
   }
@@ -564,16 +585,41 @@ export function fuseMultiAngleAnthropometrics(
   const isFemale = biologicalSex === "female";
 
   // Anatomical soft-tissue expansion factors from internal skeletal joint distances:
-  const outerShoulderWidthCm = front.shoulderWidthCm * (isFemale ? 1.12 : 1.16);
-  const outerHipWidthCm = front.hipWidthCm * (isFemale ? 1.25 : 1.18);
-  const outerWaistWidthCm = front.waistWidthCm * (isFemale ? 1.12 : 1.16);
+  // MediaPipe landmarks 11-12 & 23-24 track internal skeletal joints (glenohumeral and femoral heads),
+  // which in real computer vision are substantially narrower (hip ratio ~0.10) than outer body breadth.
+  const isInternalJointScale = front.hipWidthCm / anchorHeightCm <= 0.135;
+  const shoulderExpansion = isInternalJointScale
+    ? isFemale
+      ? 1.25
+      : 1.3
+    : isFemale
+      ? 1.12
+      : 1.16;
+  const hipExpansion = isInternalJointScale
+    ? isFemale
+      ? 1.8
+      : 1.72
+    : isFemale
+      ? 1.25
+      : 1.18;
+  const waistExpansion = isInternalJointScale
+    ? isFemale
+      ? 1.4
+      : 1.36
+    : isFemale
+      ? 1.12
+      : 1.16;
+
+  const outerShoulderWidthCm = front.shoulderWidthCm * shoulderExpansion;
+  const outerHipWidthCm = front.hipWidthCm * hipExpansion;
+  const outerWaistWidthCm = front.waistWidthCm * waistExpansion;
 
   // Frame somatotype index F_s:
   const nominalCombinedSpan = (isFemale ? 0.41 : 0.42) * anchorHeightCm;
   const actualCombinedSpan = outerShoulderWidthCm + outerHipWidthCm;
   const frameIndex = Math.max(
     0.84,
-    Math.min(1.40, actualCombinedSpan / nominalCombinedSpan),
+    Math.min(1.4, actualCombinedSpan / nominalCombinedSpan),
   );
 
   const somatotype = classifySomatotype(
@@ -585,7 +631,8 @@ export function fuseMultiAngleAnthropometrics(
 
   // Sagittal depths (chest & abdominal):
   const outerChestDepthCm = side.chestDepthCm * (isFemale ? 1.04 : 1.08);
-  const outerAbdominalDepthCm = side.abdominalDepthCm * (isFemale ? 1.04 : 1.08);
+  const outerAbdominalDepthCm =
+    side.abdominalDepthCm * (isFemale ? 1.04 : 1.08);
   const outerHipDepthCm = side.abdominalDepthCm * (isFemale ? 1.14 : 1.08);
 
   // 1. Ramanujan true elliptical circumferences:
@@ -827,11 +874,9 @@ export function computeAnthropometrics(
   // Approximate sagittal depth using statistical human proportion ratios dynamically scaled by frame breadth
   const syntheticSide: SideViewMeasurements = {
     chestDepthCm: Number(
-      (
-        front.shoulderWidthCm *
-        (isFemale ? 0.6 : 0.66) *
-        breadthFactor
-      ).toFixed(1),
+      (front.shoulderWidthCm * (isFemale ? 0.6 : 0.66) * breadthFactor).toFixed(
+        1,
+      ),
     ),
     abdominalDepthCm: Number(
       (
