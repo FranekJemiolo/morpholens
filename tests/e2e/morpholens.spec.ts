@@ -304,4 +304,50 @@ test.describe("MorphoLens E2E Suite", () => {
         .or(page.getByText("STANDBY")),
     ).toBeVisible();
   });
+
+  test("opens 20 Celebrity Calibration Benchmarks modal and tests Arnold Schwarzenegger profile", async ({
+    page,
+  }) => {
+    const benchmarksButton = page.getByTestId("btn-open-benchmarks");
+    await expect(benchmarksButton).toBeVisible();
+    await benchmarksButton.click();
+
+    // Verify modal appears
+    const modal = page.getByTestId("celebrity-benchmark-modal");
+    await expect(modal).toBeVisible();
+    await expect(
+      page.getByText("Celebrity Calibration & Extreme Benchmarks"),
+    ).toBeVisible();
+    await expect(page.getByText("20 Ground Truth Profiles")).toBeVisible();
+
+    // Verify extreme profiles exist in modal
+    await expect(page.getByText("Eddie Hall")).toBeVisible();
+    await expect(page.getByText("Arnold Schwarzenegger")).toBeVisible();
+    await expect(page.getByText("Simone Biles")).toBeVisible();
+
+    // Filter by Hyper-Muscular Bodybuilder
+    const bodybuilderTab = page.getByTestId(
+      "btn-category-hyper-muscular-bodybuilder",
+    );
+    await bodybuilderTab.click();
+    await expect(page.getByText("Arnold Schwarzenegger")).toBeVisible();
+
+    // Click to test Arnold's optical profile
+    const selectArnoldBtn = page.getByTestId(
+      "btn-select-celebrity-arnold-schwarzenegger",
+    );
+    await selectArnoldBtn.click();
+
+    // Verify modal closes and Arnold is loaded as active calibration target
+    await expect(modal).not.toBeVisible();
+    await expect(page.getByTestId("badge-active-celebrity")).toBeVisible();
+    await expect(page.getByTestId("badge-active-celebrity")).toContainText(
+      "Arnold Schwarzenegger",
+    );
+
+    // Check that telemetry computed for Arnold (height 188cm, weight ~107kg)
+    const weightCard = page.getByTestId("card-weight");
+    await expect(weightCard).toBeVisible();
+    await expect(weightCard).toContainText(/10[0-9]|11[0-4]/);
+  });
 });

@@ -86,6 +86,7 @@ export interface AnthropometricMetrics {
   isDualAngle: boolean;
   biologicalSex?: "male" | "female";
   bmi?: number;
+  somatotype?: "ectomorph" | "mesomorph" | "endomorph" | "hyper-muscular";
   frontSnapshot?: FrontViewMeasurements;
   sideSnapshot?: SideViewMeasurements;
 }

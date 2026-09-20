@@ -520,6 +520,38 @@ export function detectBiologicalSex(
 }
 
 /**
+ * Classifies the anatomical somatotype based on biacromial breadth, bi-iliac breadth,
+ * stature, and sexual dimorphism.
+ */
+export function classifySomatotype(
+  shoulderWidthCm: number,
+  hipWidthCm: number,
+  anchorHeightCm: number,
+  isFemale: boolean,
+): "ectomorph" | "mesomorph" | "endomorph" | "hyper-muscular" {
+  const shoulderRatio = shoulderWidthCm / anchorHeightCm;
+  const hipRatio = hipWidthCm / anchorHeightCm;
+  const vTaper = hipRatio > 0.01 ? shoulderRatio / hipRatio : 1.3;
+
+  if (shoulderRatio >= (isFemale ? 0.235 : 0.268) && vTaper >= 1.32) {
+    return "hyper-muscular";
+  }
+  if (
+    shoulderRatio <= (isFemale ? 0.210 : 0.224) &&
+    hipRatio <= (isFemale ? 0.200 : 0.180)
+  ) {
+    return "ectomorph";
+  }
+  if (
+    hipRatio >= (isFemale ? 0.235 : 0.212) ||
+    (shoulderRatio >= 0.265 && vTaper < 1.32)
+  ) {
+    return "endomorph";
+  }
+  return "mesomorph";
+}
+
+/**
  * Fuses Coronal (Front) and Sagittal (Side) dimensions using dual-view
  * elliptical cross-section volumetric integration and Siri/Brozek body density models.
  */
@@ -535,6 +567,21 @@ export function fuseMultiAngleAnthropometrics(
   const outerShoulderWidthCm = front.shoulderWidthCm * (isFemale ? 1.12 : 1.16);
   const outerHipWidthCm = front.hipWidthCm * (isFemale ? 1.25 : 1.18);
   const outerWaistWidthCm = front.waistWidthCm * (isFemale ? 1.12 : 1.16);
+
+  // Frame somatotype index F_s:
+  const nominalCombinedSpan = (isFemale ? 0.41 : 0.42) * anchorHeightCm;
+  const actualCombinedSpan = outerShoulderWidthCm + outerHipWidthCm;
+  const frameIndex = Math.max(
+    0.84,
+    Math.min(1.40, actualCombinedSpan / nominalCombinedSpan),
+  );
+
+  const somatotype = classifySomatotype(
+    outerShoulderWidthCm,
+    outerHipWidthCm,
+    anchorHeightCm,
+    isFemale,
+  );
 
   // Sagittal depths (chest & abdominal):
   const outerChestDepthCm = side.chestDepthCm * (isFemale ? 1.04 : 1.08);
@@ -561,7 +608,7 @@ export function fuseMultiAngleAnthropometrics(
   // 2. Multi-Segment Volumetric Integration:
   // A. Torso / Trunk:
   // Effective trunk length from clavicular notch down to perineal floor:
-  const trunkLengthCm = front.torsoLengthCm * 1.18;
+  const trunkLengthCm = front.torsoLengthCm * (isFemale ? 1.15 : 1.18);
   const aChest = outerShoulderWidthCm * (isFemale ? 0.82 : 0.88);
   const areaChest = Math.PI * (aChest / 2) * (outerChestDepthCm / 2);
   const areaWaist = Math.PI * aW * bW;
@@ -571,9 +618,10 @@ export function fuseMultiAngleAnthropometrics(
   const torsoVolL =
     ((trunkLengthCm / 6) * (areaChest + 4 * areaWaist + areaHips)) / 1000;
 
-  // B. Arms (Dual Conical Frustums from shoulder to wrist):
-  const rArmProx = outerShoulderWidthCm * 0.125;
-  const rArmDist = outerShoulderWidthCm * 0.075;
+  // B. Arms (Dual Conical Frustums from shoulder to wrist with somatotype scaling):
+  const limbThicknessMultiplier = Math.pow(frameIndex, 0.45);
+  const rArmProx = outerShoulderWidthCm * 0.125 * limbThicknessMultiplier;
+  const rArmDist = outerShoulderWidthCm * 0.075 * limbThicknessMultiplier;
   const armVolL =
     (Math.PI *
       front.armLengthCm *
@@ -583,9 +631,10 @@ export function fuseMultiAngleAnthropometrics(
   const armsVolL = 2 * armVolL;
 
   // C. Legs (Dual Conical Frustums for thigh & shank):
-  const rThigh = outerHipWidthCm * (isFemale ? 0.26 : 0.24);
-  const rKnee = outerHipWidthCm * 0.165;
-  const rAnkle = outerHipWidthCm * 0.105;
+  const rThigh =
+    outerHipWidthCm * (isFemale ? 0.26 : 0.24) * limbThicknessMultiplier;
+  const rKnee = outerHipWidthCm * 0.165 * limbThicknessMultiplier;
+  const rAnkle = outerHipWidthCm * 0.105 * limbThicknessMultiplier;
   const thighLength = front.legLengthCm * 0.52;
   const shankLength = front.legLengthCm * 0.48;
   const thighVolL =
@@ -611,10 +660,10 @@ export function fuseMultiAngleAnthropometrics(
   const tissueDensity = isFemale ? 1.045 : 1.055;
   let estimatedWeightKg = totalVolumeL * tissueDensity;
 
-  // Normative physiological bounding: allows BMI 16.5 up to 42.0 (broad athlete/robust frame)
+  // Normative physiological bounding: allows BMI 15.5 up to 50.0 (covering slender to strongman extremes)
   const heightM = anchorHeightCm / 100;
-  const minPlausibleWeight = 16.5 * heightM * heightM;
-  const maxPlausibleWeight = 42.0 * heightM * heightM;
+  const minPlausibleWeight = 15.5 * heightM * heightM;
+  const maxPlausibleWeight = 50.0 * heightM * heightM;
   estimatedWeightKg = Math.min(
     maxPlausibleWeight,
     Math.max(minPlausibleWeight, estimatedWeightKg),
@@ -699,6 +748,7 @@ export function fuseMultiAngleAnthropometrics(
     skeletalMuscleMassKg: Number(skeletalMuscleMassKg.toFixed(1)),
     biologicalSex,
     bmi: Number(bmi.toFixed(1)),
+    somatotype,
     confidence: 0.95,
     poseDetected: true,
     isDualAngle: true,
@@ -766,13 +816,29 @@ export function computeAnthropometrics(
 
   const isFemale = biologicalSex === "female";
 
-  // Approximate sagittal depth using statistical human proportion ratios
+  // Dynamic breadth factor derived from biacromial-to-stature ratio:
+  const nominalShoulderRatio = isFemale ? 0.215 : 0.235;
+  const actualShoulderRatio = front.shoulderWidthCm / anchorHeightCm;
+  const breadthFactor = Math.max(
+    0.86,
+    Math.min(1.32, actualShoulderRatio / nominalShoulderRatio),
+  );
+
+  // Approximate sagittal depth using statistical human proportion ratios dynamically scaled by frame breadth
   const syntheticSide: SideViewMeasurements = {
     chestDepthCm: Number(
-      (front.shoulderWidthCm * (isFemale ? 0.6 : 0.66)).toFixed(1),
+      (
+        front.shoulderWidthCm *
+        (isFemale ? 0.6 : 0.66) *
+        breadthFactor
+      ).toFixed(1),
     ),
     abdominalDepthCm: Number(
-      (front.waistWidthCm * (isFemale ? 0.76 : 0.8)).toFixed(1),
+      (
+        front.waistWidthCm *
+        (isFemale ? 0.76 : 0.8) *
+        Math.pow(breadthFactor, 0.8)
+      ).toFixed(1),
     ),
     cervicalPostureAngleDeg: 12.0,
     pelvicTiltAngleDeg: 8.0,

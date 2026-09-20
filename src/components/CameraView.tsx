@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Upload,
   Camera,
+  Trophy,
 } from "lucide-react";
 import type {
   NormalizedLandmark,
@@ -54,6 +55,8 @@ interface CameraViewProps {
   onResetScan: () => void;
   biologicalSex?: "male" | "female";
   onToggleSex?: () => void;
+  onOpenBenchmarks?: () => void;
+  activeCelebrityName?: string | null;
 }
 
 export const CameraView: React.FC<CameraViewProps> = ({
@@ -88,6 +91,8 @@ export const CameraView: React.FC<CameraViewProps> = ({
   onResetScan,
   biologicalSex = "male",
   onToggleSex,
+  onOpenBenchmarks,
+  activeCelebrityName,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [showSampleMenu, setShowSampleMenu] = useState(false);
@@ -662,6 +667,20 @@ export const CameraView: React.FC<CameraViewProps> = ({
                     </span>
                   </button>
 
+                  <button
+                    data-testid="btn-open-benchmarks-dropdown"
+                    onClick={() => {
+                      onOpenBenchmarks?.();
+                      setShowSampleMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-amber-500/15 text-amber-300 hover:text-amber-200 transition flex items-center justify-between cursor-pointer border-t border-slate-800 mt-1 pt-1.5"
+                  >
+                    <span className="flex items-center space-x-1.5">
+                      <Trophy className="w-3 h-3 text-amber-400" />
+                      <span>⭐ 20 Celebrity Benchmarks...</span>
+                    </span>
+                  </button>
+
                   {samplePresetId && (
                     <button
                       data-testid="btn-sample-clear"
@@ -677,6 +696,17 @@ export const CameraView: React.FC<CameraViewProps> = ({
                 </div>
               )}
             </div>
+
+          {activeCelebrityName && (
+            <div
+              className="px-2 py-0.5 rounded text-[10px] font-mono border bg-amber-500/15 text-amber-300 border-amber-500/40 flex items-center space-x-1 shadow-sm"
+              title={`Active Calibration Benchmark: ${activeCelebrityName}`}
+              data-testid="badge-active-celebrity"
+            >
+              <Trophy className="w-2.5 h-2.5 text-amber-400" />
+              <span className="font-bold truncate max-w-[120px]">{activeCelebrityName}</span>
+            </div>
+          )}
 
           {!isMock && !sampleImageUrl && isLiveCameraActive && (
             <button

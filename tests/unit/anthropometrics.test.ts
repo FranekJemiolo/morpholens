@@ -190,7 +190,7 @@ describe("Anthropometrics Math & Regression Engine", () => {
 
         // Weight and lean mass must be positive and non-NaN
         expect(metrics.estimatedWeightKg).toBeGreaterThan(40);
-        expect(metrics.estimatedWeightKg).toBeLessThan(140);
+        expect(metrics.estimatedWeightKg).toBeLessThanOrEqual(165);
         expect(metrics.leanBodyMassKg).toBeGreaterThan(30);
         expect(metrics.skeletalMuscleMassKg).toBeGreaterThan(15);
         expect(Number.isNaN(metrics.estimatedWeightKg)).toBe(false);

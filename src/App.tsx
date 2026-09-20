@@ -7,6 +7,7 @@ import {
   Video,
   Box,
   PlayCircle,
+  Trophy,
 } from "lucide-react";
 import { useWebcam } from "./hooks/useWebcam.ts";
 import {
@@ -35,6 +36,11 @@ import { CameraView } from "./components/CameraView.tsx";
 import { BodyMesh } from "./components/BodyMesh.tsx";
 import { MetricsDisplay } from "./components/MetricsDisplay.tsx";
 import { SAMPLE_HUMANS } from "./services/samplePresets.ts";
+import { CelebrityBenchmarkModal } from "./components/CelebrityBenchmarkModal.tsx";
+import {
+  type CelebrityBenchmark,
+  generateCelebrityLandmarks,
+} from "./services/celebrityBenchmarks.ts";
 
 export default function App(): React.JSX.Element {
   const webcam = useWebcam(false);
@@ -123,6 +129,10 @@ export default function App(): React.JSX.Element {
     setCustomOrientation((prev) => (prev === "front" ? "side" : "front"));
   }, []);
 
+  const [isCelebrityModalOpen, setIsCelebrityModalOpen] = useState(false);
+  const [selectedCelebrity, setSelectedCelebrity] =
+    useState<CelebrityBenchmark | null>(null);
+
   const handleStartLiveCamera = useCallback(() => {
     if (sampleImageUrl) {
       setSamplePresetId(null);
@@ -130,6 +140,7 @@ export default function App(): React.JSX.Element {
       setLandmarks(null);
       setMetrics(null);
     }
+    setSelectedCelebrity(null);
     webcam.startLiveCamera();
   }, [sampleImageUrl, webcam]);
 
@@ -137,6 +148,7 @@ export default function App(): React.JSX.Element {
     webcam.stopLiveCamera();
     setLandmarks(null);
     setMetrics(null);
+    setSelectedCelebrity(null);
   }, [webcam]);
 
   const handleSelectSample = useCallback(
@@ -144,6 +156,7 @@ export default function App(): React.JSX.Element {
       if (webcam.isLiveCameraActive) {
         webcam.stopLiveCamera();
       }
+      setSelectedCelebrity(null);
 
       if (!presetId) {
         setSamplePresetId(null);
@@ -174,6 +187,43 @@ export default function App(): React.JSX.Element {
       }
     },
     [webcam, isSexManuallySet],
+  );
+
+  const handleSelectCelebrity = useCallback(
+    (benchmark: CelebrityBenchmark) => {
+      if (webcam.isLiveCameraActive) {
+        webcam.stopLiveCamera();
+      }
+      setSamplePresetId(null);
+      setSampleImageUrl(null);
+      setSelectedCelebrity(benchmark);
+      setAnchorHeightCm(benchmark.heightCm);
+      setBiologicalSex(benchmark.gender);
+      setIsSexManuallySet(true);
+
+      const vWidth = 640;
+      const vHeight = 480;
+      const synthesizedLandmarks = generateCelebrityLandmarks(
+        benchmark,
+        vWidth,
+        vHeight,
+      );
+      setLandmarks(synthesizedLandmarks);
+
+      const calculatedMetrics = computeAnthropometrics(
+        synthesizedLandmarks,
+        benchmark.heightCm,
+        vWidth,
+        vHeight,
+        benchmark.gender,
+      );
+      setMetrics(calculatedMetrics);
+
+      const q = evaluatePoseQuality(synthesizedLandmarks, "front");
+      setQuality(q);
+      feedback.playCaptureChime();
+    },
+    [webcam],
   );
 
   // Initialize MediaPipe PoseLandmarker model
@@ -553,6 +603,7 @@ export default function App(): React.JSX.Element {
                 if (sampleImageUrl) {
                   handleSelectSample(null);
                 }
+                setSelectedCelebrity(null);
                 webcam.toggleMockMode();
               }}
               title={
@@ -568,6 +619,21 @@ export default function App(): React.JSX.Element {
             >
               <PlayCircle className="w-3.5 h-3.5 text-amber-400" />
               <span>{webcam.isMock ? "SIMULATING" : "SIMULATE"}</span>
+            </button>
+
+            {/* 20 Celebrity Benchmarks button */}
+            <button
+              data-testid="btn-open-benchmarks"
+              onClick={() => setIsCelebrityModalOpen(true)}
+              title="Open 20 Verified Celebrity & Extreme Calibration Benchmarks"
+              className={`px-2.5 py-1 rounded-lg text-xs font-mono border transition flex items-center space-x-1.5 ${
+                selectedCelebrity
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-neon"
+                  : "bg-slate-900/80 hover:bg-slate-800 text-amber-400/90 hover:text-amber-300 border-amber-500/30 hover:border-amber-400/60"
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span className="font-bold">BENCHMARKS</span>
             </button>
 
             <div className="hidden md:flex items-center space-x-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-800 text-xs font-mono text-slate-300">
@@ -668,6 +734,8 @@ export default function App(): React.JSX.Element {
               onResetScan={resetScan}
               biologicalSex={biologicalSex}
               onToggleSex={handleToggleSex}
+              onOpenBenchmarks={() => setIsCelebrityModalOpen(true)}
+              activeCelebrityName={selectedCelebrity?.name ?? null}
             />
           </div>
 
@@ -694,6 +762,14 @@ export default function App(): React.JSX.Element {
           />
         </div>
       </main>
+
+      {/* 20 Celebrity & Extreme Calibration Benchmark Modal */}
+      <CelebrityBenchmarkModal
+        isOpen={isCelebrityModalOpen}
+        onClose={() => setIsCelebrityModalOpen(false)}
+        onSelectCelebrity={handleSelectCelebrity}
+        currentSelectedId={selectedCelebrity?.id}
+      />
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950/60 mt-auto py-4 text-xs font-mono text-slate-500">
